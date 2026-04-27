@@ -21,6 +21,7 @@ pub struct Sentence {
     pub translated_text: String,
     pub source_context: Option<String>,
     pub audio_file_name: Option<String>,
+    /// milliseconds
     pub created_at: i64,
 }
 
@@ -76,7 +77,7 @@ pub async fn fetch_all_sentences(pool: &SqlitePool) -> Result<Vec<Sentence>, sql
     sqlx::query_as::<_, Sentence>(
         "SELECT id, original_text, translated_text, source_context, audio_file_name, created_at
          FROM sentences
-         ORDER BY created_at DESC",
+         ORDER BY created_at DESC, id DESC",
     )
     .fetch_all(pool)
     .await

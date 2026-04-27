@@ -1,25 +1,21 @@
-import { Button } from "@/components/ui/button.tsx";
-import { Card, CardContent, CardHeader } from "@/components/ui/card.tsx";
-import { ScrollArea } from "@/components/ui/scroll-area.tsx";
-import { useSentences } from "@/hooks/useSentences.ts";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useSentences } from "@/hooks/useSentences";
 
 export function LibraryView() {
-  const { sentences, isLoading, error, addTestSentence } = useSentences();
+  const { sentences, isLoading, error } = useSentences();
 
   return (
-    <div className="flex flex-col h-full gap-4">
-      <header className="flex items-center justify-between">
+    <div className="flex flex-col h-full gap-4 overflow-hidden">
+      <header className="flex-none">
         <h1 className="text-2xl font-bold tracking-tight">Sentence Library</h1>
-        <Button onClick={() => addTestSentence.mutate()} disabled={addTestSentence.isPending}>
-          {addTestSentence.isPending ? "Saving..." : "Add Test Data"}
-        </Button>
       </header>
 
-      <main className="flex-1 overflow-hidden">
-        {isLoading && <p className="text-sm text-muted-foreground">Loading...</p>}
-        {error && <p className="text-sm text-destructive">Failed to load data.</p>}
+      <main className="flex-1 flex flex-col min-h-0 overflow-hidden">
+        {isLoading && <p className="text-sm text-muted-foreground flex-none">Loading...</p>}
+        {error && <p className="text-sm text-destructive flex-none">Failed to load data.</p>}
 
-        <ScrollArea className="h-full rounded-md border p-4">
+        <ScrollArea className="flex-1 rounded-md border p-4">
           <div className="flex flex-col gap-4">
             {sentences.length === 0 && !isLoading && (
               <p className="text-sm text-muted-foreground text-center py-10">
