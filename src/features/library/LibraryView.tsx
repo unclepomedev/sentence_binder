@@ -17,7 +17,7 @@ export function LibraryView() {
 
         <ScrollArea className="flex-1 rounded-md border p-4">
           <div className="flex flex-col gap-4">
-            {sentences.length === 0 && !isLoading && (
+            {sentences.length === 0 && !isLoading && !error && (
               <p className="text-sm text-muted-foreground text-center py-10">
                 No sentences saved yet.
               </p>
