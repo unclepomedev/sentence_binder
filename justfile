@@ -17,4 +17,5 @@ fmt-rs:
 fmt-all: fmt-ts fmt-rs
 
 no-jpn:
-    status=0; rg '[\p{Han}\p{Hiragana}\p{Katakana}]' src src-tauri public .stylelintrc.json biome.json components.json index.html package.json tsconfig.json vite.config.ts >/dev/null || status=$?; [ "$status" -eq 1 ]
+    # Fails if any Han/Hiragana/Katakana character is found in tracked sources.
+    ! rg --hidden --glob '!.git' '[\p{Han}\p{Hiragana}\p{Katakana}]' .
