@@ -17,7 +17,7 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(generate_handler![save_sentence])
+        .invoke_handler(generate_handler![save_sentence, get_sentences])
         .run(generate_context!())
         .expect("error while running tauri application");
 }
@@ -38,4 +38,11 @@ async fn save_sentence(
     )
     .await
     .map_err(|e| format!("Failed to save sentence: {}", e))
+}
+
+#[command]
+async fn get_sentences(state: State<'_, db::DbState>) -> Result<Vec<db::Sentence>, String> {
+    db::fetch_all_sentences(&state.0)
+        .await
+        .map_err(|e| format!("Failed to fetch sentences: {}", e))
 }
