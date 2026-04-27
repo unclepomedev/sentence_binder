@@ -3,8 +3,8 @@ use sqlx::{
     sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions},
     SqlitePool,
 };
+use std::error::Error;
 use std::fs::create_dir_all;
-use std::str::FromStr;
 use tauri::{AppHandle, Manager};
 use uuid::Uuid;
 
@@ -12,19 +12,15 @@ pub const DB_NAME: &str = "sentence_binder.db";
 
 pub struct DbState(pub SqlitePool);
 
-pub async fn init_db(app_handle: &AppHandle) -> Result<SqlitePool, sqlx::Error> {
-    let app_dir = app_handle
-        .path()
-        .app_data_dir()
-        .expect("Failed to get app data dir");
+pub async fn init_db(app_handle: &AppHandle) -> Result<SqlitePool, Box<dyn Error>> {
+    let app_dir = app_handle.path().app_data_dir()?;
     if !app_dir.exists() {
-        create_dir_all(&app_dir).expect("Failed to create app data dir");
+        create_dir_all(&app_dir)?;
     }
 
     let db_path = app_dir.join(DB_NAME);
-    let db_url = format!("sqlite://{}", db_path.display());
-
-    let options = SqliteConnectOptions::from_str(&db_url)?
+    let options = SqliteConnectOptions::new()
+        .filename(&db_path)
         .create_if_missing(true)
         .journal_mode(SqliteJournalMode::Wal)
         .foreign_keys(true);
@@ -71,8 +67,13 @@ mod tests {
 
     // Helper to spin up an in-memory DB for tests
     async fn setup_in_memory_db() -> SqlitePool {
+        let options = SqliteConnectOptions::new()
+            .filename(":memory:")
+            .foreign_keys(true);
+
         let pool = SqlitePoolOptions::new()
-            .connect("sqlite::memory:")
+            .max_connections(1)
+            .connect_with(options)
             .await
             .expect("Failed to create in-memory database");
 

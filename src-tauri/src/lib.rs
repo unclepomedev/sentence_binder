@@ -11,11 +11,7 @@ pub fn run() {
             let handle = app.handle().clone();
 
             // Block the main thread just long enough to initialize the DB and run migrations
-            let pool = block_on(async move {
-                db::init_db(&handle)
-                    .await
-                    .expect("Failed to initialize database")
-            });
+            let pool = block_on(async move { db::init_db(&handle).await })?;
 
             app.manage(db::DbState(pool));
 
