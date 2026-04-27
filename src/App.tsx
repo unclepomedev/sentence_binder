@@ -1,4 +1,4 @@
-import { Toaster } from "sonner";
+import { Toaster } from "@/components/ui/sonner";
 import { LibraryView } from "@/features/library/LibraryView";
 
 function App() {
