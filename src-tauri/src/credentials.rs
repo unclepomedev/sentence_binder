@@ -64,9 +64,15 @@ pub fn has_key(provider: LlmProvider) -> Result<bool, CredentialError> {
     let entry = Entry::new(SERVICE_NAME, provider.as_str())
         .map_err(|e| CredentialError(format!("Keychain access failed: {}", e)))?;
 
-    // `keyring_core` does not expose a native existence-check API, so this
-    // implementation calls `get_password` and immediately drops the returned
-    // string. The secret is never logged, returned, or otherwise observed.
+    entry_exists(&entry)
+}
+
+/// Returns `true` if the keychain entry has a password, `false` if it has none.
+///
+/// `keyring_core` does not expose a native existence-check API, so this calls
+/// `get_password` and immediately drops the returned string. The secret is
+/// never logged, returned, or otherwise observed.
+fn entry_exists(entry: &Entry) -> Result<bool, CredentialError> {
     match entry.get_password() {
         Ok(secret) => {
             drop(secret);
@@ -117,12 +123,46 @@ mod tests {
         assert_eq!(result.unwrap_err().to_string(), "API key cannot be empty");
     }
 
+    // Test-only helpers that mirror the public save/has/delete API but accept
+    // an arbitrary `service` string. This lets the integration test use a
+    // dedicated test namespace so it cannot read, overwrite, or delete any
+    // production credential stored under `SERVICE_NAME`.
+    fn save_key_in(service: &str, account: &str, key: &str) -> Result<(), CredentialError> {
+        let trimmed = key.trim();
+        if trimmed.is_empty() {
+            return Err(CredentialError("API key cannot be empty".to_string()));
+        }
+        let entry = Entry::new(service, account)
+            .map_err(|e| CredentialError(format!("Keychain access failed: {}", e)))?;
+        entry
+            .set_password(trimmed)
+            .map_err(|e| CredentialError(format!("Failed to save key: {}", e)))
+    }
+
+    fn has_key_in(service: &str, account: &str) -> Result<bool, CredentialError> {
+        let entry = Entry::new(service, account)
+            .map_err(|e| CredentialError(format!("Keychain access failed: {}", e)))?;
+        entry_exists(&entry)
+    }
+
+    fn delete_key_in(service: &str, account: &str) -> Result<(), CredentialError> {
+        let entry = Entry::new(service, account)
+            .map_err(|e| CredentialError(format!("Keychain access failed: {}", e)))?;
+        match entry.delete_credential() {
+            Ok(_) | Err(Error::NoEntry) => Ok(()),
+            Err(e) => Err(CredentialError(format!("Failed to delete key: {}", e))),
+        }
+    }
+
     /// Integration test: performs a real keychain round-trip.
     ///
     /// Requires a configured default `keyring_core` store (e.g. the macOS
     /// Apple Keychain store initialized in `lib.rs`). Ignored by default so
     /// it doesn't run in normal CI; run with:
     ///   cargo test -- --ignored test_keychain_round_trip
+    ///
+    /// Uses a test-only service/account namespace so the production
+    /// `SERVICE_NAME` + `LlmProvider::*` slots are never touched.
     #[test]
     #[ignore]
     fn test_keychain_round_trip() {
@@ -134,45 +174,36 @@ mod tests {
             keyring_core::set_default_store(store);
         });
 
-        // The public save/has/delete API is keyed by SERVICE_NAME + provider, so any
-        // round-trip touches the same Keychain entry that production uses. To avoid
-        // clobbering a real user-stored key for `LlmProvider::Local`, skip the test
-        // if such a key already exists (we can't snapshot it without exposing the secret).
-        match has_key(LlmProvider::Local) {
-            Ok(true) => {
-                eprintln!(
-                    "[test] Skipping: pre-existing `Local` credential present; \
-                     refusing to overwrite."
-                );
-                return;
-            }
-            Ok(false) => {}
-            Err(e) => panic!("pre-test has_key failed: {}", e),
-        }
-
+        // Dedicated test namespace — must not collide with the production
+        // `SERVICE_NAME` constant or any real provider account name.
+        const TEST_SERVICE: &str = "sentence_binder_secure_vault__test";
+        let test_account = format!("test_account_{}", uuid::Uuid::new_v4());
         let secret = format!("test-secret-{}", uuid::Uuid::new_v4());
 
         // Catch panics to ensure the teardown block always runs.
         let outcome = std::panic::catch_unwind(|| {
             assert!(
-                save_key(LlmProvider::Local, &secret).is_ok(),
+                save_key_in(TEST_SERVICE, &test_account, &secret).is_ok(),
                 "save_key failed"
             );
             assert_eq!(
-                has_key(LlmProvider::Local).expect("has_key failed"),
+                has_key_in(TEST_SERVICE, &test_account).expect("has_key failed"),
                 true,
                 "key should exist after save"
             );
-            assert!(delete_key(LlmProvider::Local).is_ok(), "delete_key failed");
+            assert!(
+                delete_key_in(TEST_SERVICE, &test_account).is_ok(),
+                "delete_key failed"
+            );
             assert_eq!(
-                has_key(LlmProvider::Local).expect("has_key failed"),
+                has_key_in(TEST_SERVICE, &test_account).expect("has_key failed"),
                 false,
                 "key should be absent after delete"
             );
         });
 
         // Teardown: ensure the synthetic secret never leaks into the Keychain.
-        let _ = delete_key(LlmProvider::Local);
+        let _ = delete_key_in(TEST_SERVICE, &test_account);
 
         if let Err(panic) = outcome {
             std::panic::resume_unwind(panic);
