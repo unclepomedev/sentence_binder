@@ -1,3 +1,5 @@
+use crate::constants;
+
 use chrono::Utc;
 use serde::Serialize;
 use sqlx::{
@@ -8,8 +10,6 @@ use std::error::Error;
 use std::fs::create_dir_all;
 use tauri::{AppHandle, Manager};
 use uuid::Uuid;
-
-pub const DB_NAME: &str = "sentence_binder.db";
 
 pub struct DbState(pub SqlitePool);
 
@@ -31,7 +31,7 @@ pub async fn init_db(app_handle: &AppHandle) -> Result<SqlitePool, Box<dyn Error
         create_dir_all(&app_dir)?;
     }
 
-    let db_path = app_dir.join(DB_NAME);
+    let db_path = app_dir.join(constants::DB_NAME);
     let options = SqliteConnectOptions::new()
         .filename(&db_path)
         .create_if_missing(true)
@@ -39,7 +39,7 @@ pub async fn init_db(app_handle: &AppHandle) -> Result<SqlitePool, Box<dyn Error
         .foreign_keys(true);
 
     let pool = SqlitePoolOptions::new()
-        .max_connections(5)
+        .max_connections(constants::MAX_DB_CONNECTIONS)
         .connect_with(options)
         .await?;
 
