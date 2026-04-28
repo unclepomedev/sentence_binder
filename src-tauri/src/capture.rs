@@ -5,11 +5,12 @@ use core_graphics::event::{
     CGEvent, CGEventTap, CGEventTapLocation, CGEventTapOptions, CGEventTapPlacement, CGEventType,
     CallbackResult,
 };
-use std::mem::zeroed;
 use std::sync::Mutex;
 use std::thread;
 use std::time::{Duration, Instant};
+use tauri::async_runtime::spawn;
 use tauri::{AppHandle, Emitter, Runtime};
+use tokio::time::sleep;
 
 /// represents kCGEventKeyDown
 const MAC_KEYDOWN_TYPE: u32 = 10;
@@ -64,13 +65,15 @@ fn handle_event<R: Runtime>(proxy: AppHandle<R>, event_type: CGEventType, event:
         };
 
         if is_double_tap {
-            thread::sleep(constants::CLIPBOARD_READ_DELAY);
-
-            if let Ok(mut clipboard) = Clipboard::new() {
-                if let Ok(text) = clipboard.get_text() {
-                    let _ = proxy.emit(constants::EVENT_CAPTURE_TRIGGERED, text);
+            let proxy_clone = proxy.clone();
+            spawn(async move {
+                sleep(constants::CLIPBOARD_READ_DELAY).await;
+                if let Ok(mut clipboard) = Clipboard::new() {
+                    if let Ok(text) = clipboard.get_text() {
+                        let _ = proxy_clone.emit(constants::EVENT_CAPTURE_TRIGGERED, text);
+                    }
                 }
-            }
+            });
         }
     }
 }
@@ -82,22 +85,35 @@ fn handle_event<R: Runtime>(proxy: AppHandle<R>, event_type: CGEventType, event:
 /// thread would block Tauri's UI render loop and cause the OS to force-kill the application.
 pub fn setup_event_tap<R: Runtime>(app_handle: AppHandle<R>) {
     thread::spawn(move || {
-        let tap = CGEventTap::new(
+        let tap = match CGEventTap::new(
             CGEventTapLocation::HID,
             CGEventTapPlacement::HeadInsertEventTap,
             CGEventTapOptions::Default,
             vec![CGEventType::KeyDown],
             move |_proxy, event_type, event| {
                 handle_event(app_handle.clone(), event_type, event);
-                unsafe { zeroed::<CallbackResult>() }
+                CallbackResult::Keep
             },
-        )
-        .expect("Failed to create event tap");
+        ) {
+            Ok(tap) => tap,
+            Err(_) => {
+                eprintln!(
+                    "[capture] Failed to create event tap. \
+                     Please grant Accessibility / Input Monitoring permissions \
+                     in System Settings and restart the app. \
+                     Double-copy capture will be disabled."
+                );
+                return;
+            }
+        };
 
-        let loop_source = tap
-            .mach_port()
-            .create_runloop_source(0)
-            .expect("Failed to create runloop source");
+        let loop_source = match tap.mach_port().create_runloop_source(0) {
+            Ok(src) => src,
+            Err(_) => {
+                eprintln!("[capture] Failed to create runloop source. Double-copy capture will be disabled.");
+                return;
+            }
+        };
 
         let current_loop = CFRunLoop::get_current();
         current_loop.add_source(&loop_source, unsafe { kCFRunLoopCommonModes });
