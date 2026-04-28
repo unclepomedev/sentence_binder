@@ -1,3 +1,5 @@
+mod capture;
+mod constants;
 mod db;
 
 use tauri::async_runtime::block_on;
@@ -14,7 +16,7 @@ pub fn run() {
             let pool = block_on(async move { db::init_db(&handle).await })?;
 
             app.manage(db::DbState(pool));
-
+            capture::setup_event_tap(app.handle().clone());
             Ok(())
         })
         .invoke_handler(generate_handler![save_sentence, get_sentences])
