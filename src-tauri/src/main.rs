@@ -1,5 +1,5 @@
-// Prevents additional console window on Windows in release, DO NOT REMOVE!!
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+#[cfg(not(target_os = "macos"))]
+compile_error!("Sentence Binder supports macOS-only.");
 
 fn main() {
     sentence_binder_lib::run()
