@@ -17,9 +17,11 @@ function App() {
         <LibraryView />
       </div>
 
-      <div className="flex-none">
-        <SettingsTest />
-      </div>
+      {import.meta.env.DEV && (
+        <div className="flex-none">
+          <SettingsTest />
+        </div>
+      )}
 
       <Toaster />
     </div>

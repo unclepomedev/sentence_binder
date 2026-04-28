@@ -6,14 +6,24 @@ mod db;
 
 use apple_native_keyring_store::keychain::Store as AppleKeychainStore;
 
-use crate::commands::{delete_api_key, get_api_key, get_sentences, save_api_key, save_sentence};
+use crate::commands::{
+    delete_api_key, get_api_key, get_sentences, has_api_key, save_api_key, save_sentence,
+};
 use tauri::async_runtime::block_on;
 use tauri::{generate_context, generate_handler, Builder, Manager};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let store = AppleKeychainStore::new().expect("Failed to initialize Apple Keychain store");
-    keyring_core::set_default_store(store);
+    match AppleKeychainStore::new() {
+        Ok(store) => keyring_core::set_default_store(store),
+        Err(e) => {
+            eprintln!(
+                "[lib] Failed to initialize Apple Keychain store: {}. \
+                Credential-related functionality will be disabled.",
+                e
+            );
+        }
+    }
 
     Builder::default()
         .plugin(tauri_plugin_opener::init())
@@ -32,6 +42,7 @@ pub fn run() {
             get_sentences,
             save_api_key,
             get_api_key,
+            has_api_key,
             delete_api_key
         ])
         .run(generate_context!())

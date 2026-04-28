@@ -8,9 +8,10 @@ export function SettingsTest() {
   const [inputValue, setInputValue] = useState("");
 
   const handleSave = async () => {
-    if (!inputValue.trim()) return;
+    const trimmed = inputValue.trim();
+    if (!trimmed) return;
     try {
-      await saveKey(inputValue);
+      await saveKey(trimmed);
       toast.success("API Key securely saved to macOS Keychain!");
       setInputValue("");
     } catch (error) {
@@ -34,7 +35,11 @@ export function SettingsTest() {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex items-center gap-3">
-          <div className={`size-3 rounded-full ${hasKey ? "bg-green-500" : "bg-red-500"}`} />
+          <div
+            className={`size-3 rounded-full ${
+              hasKey === null ? "bg-gray-300" : hasKey ? "bg-green-500" : "bg-red-500"
+            }`}
+          />
           <span className="text-sm text-muted-foreground">
             Status: {hasKey === null ? "Loading..." : hasKey ? "Key Found" : "No Key"}
           </span>

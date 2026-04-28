@@ -1,3 +1,4 @@
+use crate::constants::KEY_NOT_FOUND_MESSAGE;
 use keyring_core::{Entry, Error};
 
 const SERVICE_NAME: &str = "sentence_binder_secure_vault";
@@ -57,7 +58,7 @@ pub fn get_key(provider: LlmProvider) -> Result<String, String> {
 
     match entry.get_password() {
         Ok(key) => Ok(key),
-        Err(Error::NoEntry) => Err("Key not found".to_string()),
+        Err(Error::NoEntry) => Err(KEY_NOT_FOUND_MESSAGE.to_string()),
         Err(e) => Err(format!("Keychain error: {}", e)),
     }
 }
@@ -100,5 +101,47 @@ mod tests {
         let result = save_key(LlmProvider::Local, "   ");
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), "API key cannot be empty");
+    }
+
+    /// Integration test: performs a real keychain round-trip.
+    ///
+    /// Requires a configured default `keyring_core` store (e.g. the macOS
+    /// Apple Keychain store initialized in `lib.rs`). Ignored by default so
+    /// it doesn't run in normal CI; run with:
+    ///   cargo test -- --ignored test_keychain_round_trip
+    #[test]
+    #[ignore]
+    fn test_keychain_round_trip() {
+        use apple_native_keyring_store::keychain::Store as AppleKeychainStore;
+        use std::sync::Once;
+        static INIT: Once = Once::new();
+        INIT.call_once(|| {
+            let store = AppleKeychainStore::new().expect("init store");
+            keyring_core::set_default_store(store);
+        });
+        let secret = format!("test-secret-{}", uuid::Uuid::new_v4());
+
+        // Catch panics to ensure the teardown block always runs
+        let outcome = std::panic::catch_unwind(|| {
+            assert!(
+                save_key(LlmProvider::Local, &secret).is_ok(),
+                "save_key failed"
+            );
+
+            let fetched = get_key(LlmProvider::Local).expect("get_key failed");
+            assert_eq!(fetched, secret, "fetched value does not match stored value");
+
+            assert!(delete_key(LlmProvider::Local).is_ok(), "delete_key failed");
+
+            let after = get_key(LlmProvider::Local);
+            assert!(after.is_err(), "expected Err after delete");
+        });
+
+        // Teardown: always attempt deletion to avoid leaking credentials into the developer's Mac
+        let _ = delete_key(LlmProvider::Local);
+
+        if let Err(panic) = outcome {
+            std::panic::resume_unwind(panic);
+        }
     }
 }
