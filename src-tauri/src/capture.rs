@@ -60,7 +60,10 @@ fn handle_event<R: Runtime>(proxy: AppHandle<R>, event_type: CGEventType, event:
 
     if key_code == KEYCODE_C && (flags.bits() & MAC_CMD_FLAG) != 0 {
         let is_double_tap = {
-            let mut detector = DETECTOR.lock().unwrap();
+            let mut detector = DETECTOR.lock().unwrap_or_else(|poisoned| {
+                eprintln!("[capture] DETECTOR mutex was poisoned; recovering.");
+                poisoned.into_inner()
+            });
             detector.register_tap(Instant::now())
         };
 
