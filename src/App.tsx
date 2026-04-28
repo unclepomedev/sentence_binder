@@ -1,6 +1,7 @@
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
 import { LibraryView } from "@/features/library/LibraryView";
+import { SettingsTest } from "@/features/settings/SettingsTest";
 import { useCapture } from "@/hooks/useCapture";
 
 function App() {
@@ -11,8 +12,15 @@ function App() {
   });
 
   return (
-    <div className="h-screen w-screen bg-background font-sans antialiased p-6">
-      <LibraryView />
+    <div className="h-screen w-screen bg-background font-sans antialiased p-6 flex flex-col gap-4">
+      <div className="flex-1 min-h-0">
+        <LibraryView />
+      </div>
+
+      <div className="flex-none">
+        <SettingsTest />
+      </div>
+
       <Toaster />
     </div>
   );
