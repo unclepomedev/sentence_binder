@@ -29,3 +29,5 @@ core-foundation = "0.10"
 core-graphics = "0.25"
 arboard = "3.6.1"
 lazy_static = "1.5.0"
+keyring-core = "1.0.0"
+apple-native-keyring-store = { version = "1.0.0", features = ["keychain"] }
