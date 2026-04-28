@@ -3,19 +3,11 @@ use keyring_core::{Entry, Error};
 const SERVICE_NAME: &str = "sentence_binder_secure_vault";
 
 #[derive(Debug)]
-pub enum CredentialError {
-    /// No entry exists for the requested provider.
-    NotFound,
-    /// Any other failure (Keychain access denied, OS error, etc.).
-    Other(String),
-}
+pub struct CredentialError(pub String);
 
 impl std::fmt::Display for CredentialError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::NotFound => write!(f, "Key not found"),
-            Self::Other(s) => write!(f, "{}", s),
-        }
+        write!(f, "{}", self.0)
     }
 }
 
@@ -52,33 +44,36 @@ impl LlmProvider {
 ///
 /// Fails if the provided key string is empty, or if the OS denies access to the Keychain.
 pub fn save_key(provider: LlmProvider, key: &str) -> Result<(), CredentialError> {
-    if key.trim().is_empty() {
-        return Err(CredentialError::Other(
-            "API key cannot be empty".to_string(),
-        ));
+    let trimmed = key.trim();
+    if trimmed.is_empty() {
+        return Err(CredentialError("API key cannot be empty".to_string()));
     }
 
     let entry = Entry::new(SERVICE_NAME, provider.as_str())
-        .map_err(|e| CredentialError::Other(format!("Keychain access failed: {}", e)))?;
+        .map_err(|e| CredentialError(format!("Keychain access failed: {}", e)))?;
 
     entry
-        .set_password(key)
-        .map_err(|e| CredentialError::Other(format!("Failed to save key: {}", e)))
+        .set_password(trimmed)
+        .map_err(|e| CredentialError(format!("Failed to save key: {}", e)))
 }
 
-/// Retrieves an API key from the macOS Keychain.
+/// Checks whether an API key exists for the given provider.
 ///
-/// Returns `Ok(key)` if found, `Err(CredentialError::NotFound)` if no entry
-/// exists for the provider, and `Err(CredentialError::Other(_))` for any
-/// other Keychain failure.
-pub fn get_key(provider: LlmProvider) -> Result<String, CredentialError> {
+/// This safely confirms existence without returning the secret value to the caller.
+pub fn has_key(provider: LlmProvider) -> Result<bool, CredentialError> {
     let entry = Entry::new(SERVICE_NAME, provider.as_str())
-        .map_err(|e| CredentialError::Other(format!("Keychain access failed: {}", e)))?;
+        .map_err(|e| CredentialError(format!("Keychain access failed: {}", e)))?;
 
+    // `keyring_core` does not expose a native existence-check API, so this
+    // implementation calls `get_password` and immediately drops the returned
+    // string. The secret is never logged, returned, or otherwise observed.
     match entry.get_password() {
-        Ok(key) => Ok(key),
-        Err(Error::NoEntry) => Err(CredentialError::NotFound),
-        Err(e) => Err(CredentialError::Other(format!("Keychain error: {}", e))),
+        Ok(secret) => {
+            drop(secret);
+            Ok(true)
+        }
+        Err(Error::NoEntry) => Ok(false),
+        Err(e) => Err(CredentialError(format!("Keychain error: {}", e))),
     }
 }
 
@@ -88,14 +83,11 @@ pub fn get_key(provider: LlmProvider) -> Result<String, CredentialError> {
 /// was already deleted or never existed.
 pub fn delete_key(provider: LlmProvider) -> Result<(), CredentialError> {
     let entry = Entry::new(SERVICE_NAME, provider.as_str())
-        .map_err(|e| CredentialError::Other(format!("Keychain access failed: {}", e)))?;
+        .map_err(|e| CredentialError(format!("Keychain access failed: {}", e)))?;
 
     match entry.delete_credential() {
         Ok(_) | Err(Error::NoEntry) => Ok(()),
-        Err(e) => Err(CredentialError::Other(format!(
-            "Failed to delete key: {}",
-            e
-        ))),
+        Err(e) => Err(CredentialError(format!("Failed to delete key: {}", e))),
     }
 }
 
@@ -142,44 +134,45 @@ mod tests {
             keyring_core::set_default_store(store);
         });
 
-        // The public save/get/delete API is keyed by SERVICE_NAME + provider, so any
+        // The public save/has/delete API is keyed by SERVICE_NAME + provider, so any
         // round-trip touches the same Keychain entry that production uses. To avoid
-        // clobbering a real user-stored key for `LlmProvider::Local`, capture any
-        // pre-existing value first, then restore (or delete) it in teardown.
-        let original = match get_key(LlmProvider::Local) {
-            Ok(v) => Some(v),
-            Err(CredentialError::NotFound) => None,
-            Err(e) => panic!("pre-test get_key failed: {}", e),
-        };
+        // clobbering a real user-stored key for `LlmProvider::Local`, skip the test
+        // if such a key already exists (we can't snapshot it without exposing the secret).
+        match has_key(LlmProvider::Local) {
+            Ok(true) => {
+                eprintln!(
+                    "[test] Skipping: pre-existing `Local` credential present; \
+                     refusing to overwrite."
+                );
+                return;
+            }
+            Ok(false) => {}
+            Err(e) => panic!("pre-test has_key failed: {}", e),
+        }
 
         let secret = format!("test-secret-{}", uuid::Uuid::new_v4());
 
-        // Catch panics to ensure the teardown block always runs
+        // Catch panics to ensure the teardown block always runs.
         let outcome = std::panic::catch_unwind(|| {
             assert!(
                 save_key(LlmProvider::Local, &secret).is_ok(),
                 "save_key failed"
             );
-
-            let fetched = get_key(LlmProvider::Local).expect("get_key failed");
-            assert_eq!(fetched, secret, "fetched value does not match stored value");
-
+            assert_eq!(
+                has_key(LlmProvider::Local).expect("has_key failed"),
+                true,
+                "key should exist after save"
+            );
             assert!(delete_key(LlmProvider::Local).is_ok(), "delete_key failed");
-
-            let after = get_key(LlmProvider::Local);
-            assert!(after.is_err(), "expected Err after delete");
+            assert_eq!(
+                has_key(LlmProvider::Local).expect("has_key failed"),
+                false,
+                "key should be absent after delete"
+            );
         });
 
-        // Teardown: restore any pre-existing credential, otherwise ensure cleanup
-        // so the test never leaks its synthetic secret into the developer's Keychain.
-        match &original {
-            Some(prev) => {
-                let _ = save_key(LlmProvider::Local, prev);
-            }
-            None => {
-                let _ = delete_key(LlmProvider::Local);
-            }
-        }
+        // Teardown: ensure the synthetic secret never leaks into the Keychain.
+        let _ = delete_key(LlmProvider::Local);
 
         if let Err(panic) = outcome {
             std::panic::resume_unwind(panic);

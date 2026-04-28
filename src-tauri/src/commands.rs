@@ -1,4 +1,4 @@
-use crate::credentials::{self, CredentialError, LlmProvider};
+use crate::credentials::{self, LlmProvider};
 use crate::db;
 use serde::Serialize;
 use tauri::async_runtime::spawn_blocking;
@@ -71,19 +71,15 @@ pub async fn has_api_key(
 ) -> Result<bool, String> {
     ensure_available(&state)?;
     let p = parse_provider(&provider)?;
-    let result = spawn_blocking(move || match credentials::get_key(p) {
-        Ok(_) => Ok(true),
-        Err(CredentialError::NotFound) => Ok(false),
-        Err(CredentialError::Other(e)) => Err(e),
-    })
-    .await
-    .map_err(|e| {
-        eprintln!(
-            "[commands] spawn_blocking join failed in has_api_key: {}",
-            e
-        );
-        "Internal error".to_string()
-    })?;
+    let result = spawn_blocking(move || credentials::has_key(p))
+        .await
+        .map_err(|e| {
+            eprintln!(
+                "[commands] spawn_blocking join failed in has_api_key: {}",
+                e
+            );
+            "Internal error".to_string()
+        })?;
     result.map_err(|e| {
         eprintln!("[commands] has_api_key credential error: {}", e);
         "Credential operation failed".to_string()
