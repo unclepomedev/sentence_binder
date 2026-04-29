@@ -114,6 +114,8 @@ mod tests {
 
         assert_eq!(LlmProvider::OpenAi.as_str(), "openai_api_key");
         assert_eq!(LlmProvider::Anthropic.as_str(), "anthropic_api_key");
+        assert_eq!(LlmProvider::Google.as_str(), "google_api_key");
+        assert_eq!(LlmProvider::Local.as_str(), "local_api_key");
     }
 
     #[test]
@@ -127,27 +129,34 @@ mod tests {
     // an arbitrary `service` string. This lets the integration test use a
     // dedicated test namespace so it cannot read, overwrite, or delete any
     // production credential stored under `SERVICE_NAME`.
-    fn save_key_in(service: &str, account: &str, key: &str) -> Result<(), CredentialError> {
+    fn keychain_entry_for(service: &str, account: &str) -> Result<Entry, CredentialError> {
+        Entry::new(service, account)
+            .map_err(|e| CredentialError(format!("Keychain access failed: {}", e)))
+    }
+
+    fn validate_api_key(key: &str) -> Result<&str, CredentialError> {
         let trimmed = key.trim();
         if trimmed.is_empty() {
             return Err(CredentialError("API key cannot be empty".to_string()));
         }
-        let entry = Entry::new(service, account)
-            .map_err(|e| CredentialError(format!("Keychain access failed: {}", e)))?;
+        Ok(trimmed)
+    }
+
+    fn save_key_in(service: &str, account: &str, key: &str) -> Result<(), CredentialError> {
+        let trimmed = validate_api_key(key)?;
+        let entry = keychain_entry_for(service, account)?;
         entry
             .set_password(trimmed)
             .map_err(|e| CredentialError(format!("Failed to save key: {}", e)))
     }
 
     fn has_key_in(service: &str, account: &str) -> Result<bool, CredentialError> {
-        let entry = Entry::new(service, account)
-            .map_err(|e| CredentialError(format!("Keychain access failed: {}", e)))?;
+        let entry = keychain_entry_for(service, account)?;
         entry_exists(&entry)
     }
 
     fn delete_key_in(service: &str, account: &str) -> Result<(), CredentialError> {
-        let entry = Entry::new(service, account)
-            .map_err(|e| CredentialError(format!("Keychain access failed: {}", e)))?;
+        let entry = keychain_entry_for(service, account)?;
         match entry.delete_credential() {
             Ok(_) | Err(Error::NoEntry) => Ok(()),
             Err(e) => Err(CredentialError(format!("Failed to delete key: {}", e))),
@@ -186,18 +195,16 @@ mod tests {
                 save_key_in(TEST_SERVICE, &test_account, &secret).is_ok(),
                 "save_key failed"
             );
-            assert_eq!(
+            assert!(
                 has_key_in(TEST_SERVICE, &test_account).expect("has_key failed"),
-                true,
                 "key should exist after save"
             );
             assert!(
                 delete_key_in(TEST_SERVICE, &test_account).is_ok(),
                 "delete_key failed"
             );
-            assert_eq!(
-                has_key_in(TEST_SERVICE, &test_account).expect("has_key failed"),
-                false,
+            assert!(
+                !has_key_in(TEST_SERVICE, &test_account).expect("has_key failed"),
                 "key should be absent after delete"
             );
         });
