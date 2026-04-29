@@ -176,7 +176,11 @@ mod tests {
     #[ignore]
     fn test_keychain_round_trip() {
         use apple_native_keyring_store::keychain::Store as AppleKeychainStore;
+        use std::panic::catch_unwind;
+        use std::panic::resume_unwind;
         use std::sync::Once;
+        use uuid::Uuid;
+
         static INIT: Once = Once::new();
         INIT.call_once(|| {
             let store = AppleKeychainStore::new().expect("init store");
@@ -186,11 +190,11 @@ mod tests {
         // Dedicated test namespace — must not collide with the production
         // `SERVICE_NAME` constant or any real provider account name.
         const TEST_SERVICE: &str = "sentence_binder_secure_vault__test";
-        let test_account = format!("test_account_{}", uuid::Uuid::new_v4());
-        let secret = format!("test-secret-{}", uuid::Uuid::new_v4());
+        let test_account = format!("test_account_{}", Uuid::new_v4());
+        let secret = format!("test-secret-{}", Uuid::new_v4());
 
         // Catch panics to ensure the teardown block always runs.
-        let outcome = std::panic::catch_unwind(|| {
+        let outcome = catch_unwind(|| {
             assert!(
                 save_key_in(TEST_SERVICE, &test_account, &secret).is_ok(),
                 "save_key failed"
@@ -213,7 +217,7 @@ mod tests {
         let _ = delete_key_in(TEST_SERVICE, &test_account);
 
         if let Err(panic) = outcome {
-            std::panic::resume_unwind(panic);
+            resume_unwind(panic);
         }
     }
 }

@@ -54,6 +54,8 @@ pub async fn fetch_all_sentences(pool: &SqlitePool) -> Result<Vec<Sentence>, sql
 mod tests {
     use super::*;
     use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
+    use std::time::Duration;
+    use tokio::time::sleep;
 
     // Helper to spin up an in-memory DB for tests
     async fn setup_in_memory_db() -> SqlitePool {
@@ -108,7 +110,7 @@ mod tests {
         insert_sentence(&pool, "First", "一つ目", None)
             .await
             .unwrap();
-        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        sleep(Duration::from_millis(10)).await;
         insert_sentence(&pool, "Second", "二つ目", Some("Context"))
             .await
             .unwrap();
