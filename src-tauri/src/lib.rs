@@ -3,6 +3,7 @@ mod commands;
 mod constants;
 mod credentials;
 mod db;
+mod domain;
 
 use apple_native_keyring_store::keychain::Store as AppleKeychainStore;
 
