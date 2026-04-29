@@ -1,6 +1,6 @@
 use crate::constants;
 use arboard::Clipboard;
-use core_foundation::runloop::{kCFRunLoopCommonModes, CFRunLoop, CFRunLoopRun};
+use core_foundation::runloop::{CFRunLoop, CFRunLoopRun, kCFRunLoopCommonModes};
 use core_graphics::event::{
     CGEvent, CGEventTap, CGEventTapLocation, CGEventTapOptions, CGEventTapPlacement, CGEventType,
     CallbackResult,
@@ -39,11 +39,11 @@ impl DoubleTapDetector {
     }
 
     pub fn register_tap(&mut self, now: Instant) -> bool {
-        if let Some(last) = self.last_tap {
-            if now.duration_since(last) < self.threshold {
-                self.last_tap = None;
-                return true;
-            }
+        if let Some(last) = self.last_tap
+            && now.duration_since(last) < self.threshold
+        {
+            self.last_tap = None;
+            return true;
         }
         self.last_tap = Some(now);
         false
@@ -71,10 +71,10 @@ fn handle_event<R: Runtime>(proxy: AppHandle<R>, event_type: CGEventType, event:
             let proxy_clone = proxy.clone();
             spawn(async move {
                 sleep(constants::CLIPBOARD_READ_DELAY).await;
-                if let Ok(mut clipboard) = Clipboard::new() {
-                    if let Ok(text) = clipboard.get_text() {
-                        let _ = proxy_clone.emit(constants::EVENT_CAPTURE_TRIGGERED, text);
-                    }
+                if let Ok(mut clipboard) = Clipboard::new()
+                    && let Ok(text) = clipboard.get_text()
+                {
+                    let _ = proxy_clone.emit(constants::EVENT_CAPTURE_TRIGGERED, text);
                 }
             });
         }
@@ -113,7 +113,9 @@ pub fn setup_event_tap<R: Runtime>(app_handle: AppHandle<R>) {
         let loop_source = match tap.mach_port().create_runloop_source(0) {
             Ok(src) => src,
             Err(_) => {
-                eprintln!("[capture] Failed to create runloop source. Double-copy capture will be disabled.");
+                eprintln!(
+                    "[capture] Failed to create runloop source. Double-copy capture will be disabled."
+                );
                 return;
             }
         };

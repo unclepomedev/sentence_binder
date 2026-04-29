@@ -1,0 +1,9 @@
+[project]
+name = "sentence-binder"
+version = "0.1.0"
+description = "Python is mainly used for local LLM setup"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "mlx-lm>=0.31.3",
+]

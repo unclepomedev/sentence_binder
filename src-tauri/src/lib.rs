@@ -4,14 +4,17 @@ mod constants;
 mod credentials;
 mod db;
 mod domain;
+mod error;
+mod infrastructure;
 
 use apple_native_keyring_store::keychain::Store as AppleKeychainStore;
 
 use crate::commands::{
-    delete_api_key, get_sentences, has_api_key, save_api_key, save_sentence, CredentialsState,
+    CredentialsState, delete_api_key, extract_usage, get_sentences, has_api_key, save_api_key,
+    save_sentence, translate_text,
 };
 use tauri::async_runtime::block_on;
-use tauri::{generate_context, generate_handler, Builder, Manager};
+use tauri::{Builder, Manager, generate_context, generate_handler};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -50,7 +53,9 @@ pub fn run() {
             get_sentences,
             save_api_key,
             has_api_key,
-            delete_api_key
+            delete_api_key,
+            extract_usage,
+            translate_text
         ])
         .run(generate_context!())
         .expect("error while running tauri application");

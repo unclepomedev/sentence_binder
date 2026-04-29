@@ -21,6 +21,14 @@ fmt-sql:
     sqruff fix src-tauri/migrations --dialect sqlite
     sqruff lint src-tauri/migrations --dialect sqlite
 
+# Python ==================================================================================================
+lllm-chat:
+    uv run mlx_lm.chat --model mlx-community/Qwen2.5-14B-Instruct-4bit
+
+lllm:
+    # Settings for development. Modify the model depending on the environment.
+    uv run mlx_lm.server --model mlx-community/Qwen2.5-14B-Instruct-4bit
+
 # General =================================================================================================
 fmt-all: fmt-ts fmt-rs fmt-sql
 
