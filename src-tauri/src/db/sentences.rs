@@ -54,8 +54,29 @@ pub async fn fetch_all_sentences(pool: &SqlitePool) -> Result<Vec<Sentence>, sql
 mod tests {
     use super::*;
     use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
-    use std::time::Duration;
-    use tokio::time::sleep;
+
+    /// Inserts a sentence with a custom timestamp for deterministic sorting tests.
+    async fn insert_sentence_at(
+        pool: &SqlitePool,
+        original_text: &str,
+        translated_text: &str,
+        source_context: Option<&str>,
+        created_at: i64,
+    ) -> Result<String, sqlx::Error> {
+        let id = Uuid::new_v4().to_string();
+        sqlx::query(
+            "INSERT INTO sentences (id, original_text, translated_text, source_context, created_at)
+             VALUES (?, ?, ?, ?, ?)",
+        )
+        .bind(&id)
+        .bind(original_text)
+        .bind(translated_text)
+        .bind(source_context)
+        .bind(created_at)
+        .execute(pool)
+        .await?;
+        Ok(id)
+    }
 
     // Helper to spin up an in-memory DB for tests
     async fn setup_in_memory_db() -> SqlitePool {
@@ -107,11 +128,10 @@ mod tests {
     async fn test_fetch_all_sentences() {
         let pool = setup_in_memory_db().await;
 
-        insert_sentence(&pool, "First", "一つ目", None)
+        insert_sentence_at(&pool, "First", "一つ目", None, 1_000)
             .await
             .unwrap();
-        sleep(Duration::from_millis(10)).await;
-        insert_sentence(&pool, "Second", "二つ目", Some("Context"))
+        insert_sentence_at(&pool, "Second", "二つ目", Some("Context"), 2_000)
             .await
             .unwrap();
 
