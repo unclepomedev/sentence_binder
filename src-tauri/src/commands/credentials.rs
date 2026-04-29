@@ -68,7 +68,7 @@ pub async fn save_api_key(
 
     let trimmed = key.trim();
     if trimmed.is_empty() {
-        return Err(AppError::Credential(API_KEY_EMPTY.to_string()));
+        return Err(AppError::Validation(API_KEY_EMPTY.to_string()));
     }
     let key = trimmed.to_string();
     let p = parse_provider(&provider)?;
