@@ -1,6 +1,7 @@
 use crate::db;
+use crate::error::AppError;
 use serde::Serialize;
-use tauri::{command, State};
+use tauri::{State, command};
 
 /// record's ID (created on insertion).
 #[derive(Serialize)]
@@ -15,7 +16,7 @@ pub async fn save_sentence(
     original_text: String,
     translated_text: String,
     source_context: Option<String>,
-) -> Result<IdResponse, String> {
+) -> Result<IdResponse, AppError> {
     let id = db::insert_sentence(
         &state.0,
         &original_text,
@@ -25,7 +26,7 @@ pub async fn save_sentence(
     .await
     .map_err(|e| {
         eprintln!("[commands] Database error in save_sentence: {}", e);
-        "Database error".to_string()
+        AppError::Db(e)
     })?;
 
     Ok(IdResponse { id })
@@ -33,9 +34,9 @@ pub async fn save_sentence(
 
 /// Fetches all saved sentences from the database for the Library view.
 #[command]
-pub async fn get_sentences(state: State<'_, db::DbState>) -> Result<Vec<db::Sentence>, String> {
+pub async fn get_sentences(state: State<'_, db::DbState>) -> Result<Vec<db::Sentence>, AppError> {
     db::fetch_all_sentences(&state.0).await.map_err(|e| {
         eprintln!("[commands] Database error in get_sentences: {}", e);
-        "Database error".to_string()
+        AppError::Db(e)
     })
 }

@@ -1,6 +1,7 @@
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
 import { LibraryView } from "@/features/library/LibraryView";
+import { TestButton } from "@/features/library/TestButton";
 import { SettingsTest } from "@/features/settings/SettingsTest";
 import { useCapture } from "@/hooks/useCapture";
 
@@ -18,7 +19,8 @@ function App() {
       </div>
 
       {import.meta.env.DEV && (
-        <div className="flex-none">
+        <div className="flex-none flex flex-col gap-4">
+          <TestButton />
           <SettingsTest />
         </div>
       )}
