@@ -1,0 +1,68 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":timezone(Asia/Tokyo)",
+    ":maintainLockFilesWeekly"
+  ],
+  "labels": [
+    "dependencies"
+  ],
+  "cargo": {
+    "managerFilePatterns": [
+      "/(^|/)Cargo\\.toml$/"
+    ],
+    "rangeStrategy": "bump"
+  },
+  "npm": {
+    "rangeStrategy": "bump"
+  },
+  "packageRules": [
+    {
+      "matchManagers": [
+        "cargo"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "groupName": "rust dependencies",
+      "automerge": false
+    },
+    {
+      "matchManagers": [
+        "npm"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "groupName": "frontend dependencies",
+      "automerge": false
+    },
+    {
+      "matchManagers": [
+        "github-actions"
+      ],
+      "pinDigests": true
+    },
+    {
+      "groupName": "tokio monorepo",
+      "matchPackageNames": [
+        "/^tokio/"
+      ]
+    },
+    {
+      "groupName": "react monorepo",
+      "matchPackageNames": [
+        "react",
+        "react-dom",
+        "@types/react",
+        "@types/react-dom"
+      ]
+    }
+  ],
+  "schedule": [
+    "before 9am on monday"
+  ]
+}
