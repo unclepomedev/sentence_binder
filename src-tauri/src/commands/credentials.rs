@@ -1,4 +1,5 @@
-use crate::credentials::{delete_key, has_key, save_key, LlmProvider};
+use crate::credentials::{delete_key, has_key, save_key};
+use crate::domain::provider::LlmProvider;
 use tauri::async_runtime::spawn_blocking;
 use tauri::{command, State};
 

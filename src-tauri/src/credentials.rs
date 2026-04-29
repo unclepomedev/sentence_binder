@@ -1,3 +1,4 @@
+use crate::domain::provider::LlmProvider;
 use keyring_core::{Entry, Error};
 
 const SERVICE_NAME: &str = "sentence_binder_secure_vault";
@@ -11,32 +12,13 @@ impl std::fmt::Display for CredentialError {
     }
 }
 
-#[derive(Debug, PartialEq)]
-pub enum LlmProvider {
-    OpenAi,
-    Anthropic,
-    Google,
-    Local,
-}
-
-impl LlmProvider {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Self::OpenAi => "openai_api_key",
-            Self::Anthropic => "anthropic_api_key",
-            Self::Google => "google_api_key",
-            Self::Local => "local_api_key",
-        }
-    }
-
-    pub fn from_str(s: &str) -> Option<Self> {
-        match s {
-            "openai" => Some(Self::OpenAi),
-            "anthropic" => Some(Self::Anthropic),
-            "google" => Some(Self::Google),
-            "local" => Some(Self::Local),
-            _ => None,
-        }
+/// Maps the domain provider to the specific macOS Keychain account name.
+fn keychain_account(provider: LlmProvider) -> &'static str {
+    match provider {
+        LlmProvider::OpenAi => "openai_api_key",
+        LlmProvider::Anthropic => "anthropic_api_key",
+        LlmProvider::Google => "google_api_key",
+        LlmProvider::Local => "local_api_key",
     }
 }
 
@@ -49,7 +31,7 @@ pub fn save_key(provider: LlmProvider, key: &str) -> Result<(), CredentialError>
         return Err(CredentialError("API key cannot be empty".to_string()));
     }
 
-    let entry = Entry::new(SERVICE_NAME, provider.as_str())
+    let entry = Entry::new(SERVICE_NAME, keychain_account(provider))
         .map_err(|e| CredentialError(format!("Keychain access failed: {}", e)))?;
 
     entry
@@ -61,7 +43,7 @@ pub fn save_key(provider: LlmProvider, key: &str) -> Result<(), CredentialError>
 ///
 /// This safely confirms existence without returning the secret value to the caller.
 pub fn has_key(provider: LlmProvider) -> Result<bool, CredentialError> {
-    let entry = Entry::new(SERVICE_NAME, provider.as_str())
+    let entry = Entry::new(SERVICE_NAME, keychain_account(provider))
         .map_err(|e| CredentialError(format!("Keychain access failed: {}", e)))?;
 
     entry_exists(&entry)
@@ -88,7 +70,7 @@ fn entry_exists(entry: &Entry) -> Result<bool, CredentialError> {
 /// This operation is idempotent; it will return `Ok(())` even if the key
 /// was already deleted or never existed.
 pub fn delete_key(provider: LlmProvider) -> Result<(), CredentialError> {
-    let entry = Entry::new(SERVICE_NAME, provider.as_str())
+    let entry = Entry::new(SERVICE_NAME, keychain_account(provider))
         .map_err(|e| CredentialError(format!("Keychain access failed: {}", e)))?;
 
     match entry.delete_credential() {
@@ -112,10 +94,13 @@ mod tests {
         assert_eq!(LlmProvider::from_str("local"), Some(LlmProvider::Local));
         assert_eq!(LlmProvider::from_str("invalid"), None);
 
-        assert_eq!(LlmProvider::OpenAi.as_str(), "openai_api_key");
-        assert_eq!(LlmProvider::Anthropic.as_str(), "anthropic_api_key");
-        assert_eq!(LlmProvider::Google.as_str(), "google_api_key");
-        assert_eq!(LlmProvider::Local.as_str(), "local_api_key");
+        assert_eq!(keychain_account(LlmProvider::OpenAi), "openai_api_key");
+        assert_eq!(
+            keychain_account(LlmProvider::Anthropic),
+            "anthropic_api_key"
+        );
+        assert_eq!(keychain_account(LlmProvider::Google), "google_api_key");
+        assert_eq!(keychain_account(LlmProvider::Local), "local_api_key");
     }
 
     #[test]
