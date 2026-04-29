@@ -24,7 +24,8 @@ const INVALID_PROVIDER: &str = "Invalid provider specified";
 
 /// Parses a provider identifier coming from the frontend into an [LlmProvider].
 fn parse_provider(provider: &str) -> Result<LlmProvider, AppError> {
-    LlmProvider::from_str(provider).ok_or_else(|| AppError::Internal(INVALID_PROVIDER.to_string()))
+    LlmProvider::from_str(provider)
+        .ok_or_else(|| AppError::Validation(INVALID_PROVIDER.to_string()))
 }
 
 fn ensure_available(state: &State<'_, CredentialsState>) -> Result<(), AppError> {

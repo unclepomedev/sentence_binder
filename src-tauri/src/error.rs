@@ -15,6 +15,10 @@ pub enum AppError {
     #[error("Credential Error: {0}")]
     Credential(String),
 
+    /// Errors originating from user input validation
+    #[error("Validation Error: {0}")]
+    Validation(String),
+
     /// General fallback for unexpected system failures
     #[error("Internal Error: {0}")]
     Internal(String),

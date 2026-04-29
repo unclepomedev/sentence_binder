@@ -1,12 +1,15 @@
 use crate::domain::engine::{LlmEngine, LlmError};
 use reqwest::Client;
 use serde_json::json;
+use std::time::Duration;
 
 // prompt templates=================================================================================
 const TRANSLATE_SYSTEM_PROMPT: &str = "You are a professional translator. Translate the following English text into natural, fluent Japanese. Provide ONLY the translation, without any explanations or conversational filler.";
 
 const USAGE_SYSTEM_PROMPT: &str = "You are an English teacher. Explain the meaning and usage of the highlighted expression based on the provided context. Provide a concise explanation in Japanese and one clear example sentence in English. Output ONLY the explanation and example.";
 // -------------------------------------------------------------------------------------------------
+
+const MLX_CLIENT_TIMEOUT_SECS: u64 = 60;
 
 pub struct MlxConfig {
     pub endpoint: String,
@@ -29,10 +32,12 @@ pub struct MlxEngine {
 
 impl MlxEngine {
     pub fn new(config: MlxConfig) -> Self {
-        Self {
-            client: Client::new(),
-            config,
-        }
+        let client = Client::builder()
+            .timeout(Duration::from_secs(MLX_CLIENT_TIMEOUT_SECS))
+            .build()
+            .unwrap_or_else(|_| Client::new());
+
+        Self { client, config }
     }
 
     /// Sends a payload to the MLX server mimicking the OpenAI chat completions API.
