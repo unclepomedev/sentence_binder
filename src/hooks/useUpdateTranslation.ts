@@ -8,11 +8,14 @@ export function useUpdateTranslation() {
   const queryClient = useQueryClient();
 
   const updateTranslation = async (id: string, newText: string, newContext: string | null) => {
+    const trimmedContext = newContext?.trim() ?? "";
+    const normalizedContext = trimmedContext === "" ? null : trimmedContext;
+
     try {
       await invoke(IpcCommands.UPDATE_SENTENCE_TRANSLATION, {
         id,
         newTranslation: newText,
-        newContext,
+        newContext: normalizedContext,
       });
 
       queryClient.setQueryData(["sentences"], (old: Sentence[] | undefined) =>
@@ -21,7 +24,7 @@ export function useUpdateTranslation() {
             ? {
                 ...s,
                 translated_text: newText,
-                source_context: newContext || null,
+                source_context: normalizedContext,
               }
             : s,
         ),
