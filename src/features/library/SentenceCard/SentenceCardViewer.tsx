@@ -93,9 +93,7 @@ export function SentenceCardViewer({
             className="h-7 w-7 text-muted-foreground hover:text-foreground transition-colors"
             onClick={handleDelete}
             disabled={deleteDisabled}
-            title={
-              deleteDisabled ? "Stop audio before deleting" : "Delete Sentence"
-            }
+            title={deleteDisabled ? "Stop audio before deleting" : "Delete Sentence"}
             aria-label="Delete sentence"
           >
             <Trash2 className="h-3.5 w-3.5" />
