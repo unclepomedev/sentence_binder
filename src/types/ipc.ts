@@ -19,6 +19,7 @@ export const IpcCommands = {
   GET_SENTENCES: "get_sentences",
   PLAY_PRONUNCIATION: "play_pronunciation",
   STOP_AUDIO: "stop_audio",
+  UPDATE_SENTENCE_TRANSLATION: "update_sentence_translation",
 } as const;
 
 export type IpcCommand = (typeof IpcCommands)[keyof typeof IpcCommands];

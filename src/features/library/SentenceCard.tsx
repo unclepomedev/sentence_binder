@@ -1,21 +1,31 @@
-import { Square, Volume2 } from "lucide-react";
+import { Pencil, Square, Volume2 } from "lucide-react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import type { Sentence } from "@/types";
+import { SentenceEditForm } from "./SentenceEditForm";
 
 interface SentenceCardProps {
   item: Sentence;
   isPlaying: boolean;
   isLocked: boolean;
   onTogglePlay: () => void;
+  onSaveEdit: (id: string, newText: string) => Promise<void>;
 }
 
-export function SentenceCard({ item, isPlaying, isLocked, onTogglePlay }: SentenceCardProps) {
+export function SentenceCard({
+  item,
+  isPlaying,
+  isLocked,
+  onTogglePlay,
+  onSaveEdit,
+}: SentenceCardProps) {
+  const [isEditing, setIsEditing] = useState(false);
+
   return (
-    <Card className="bg-card shadow-sm">
+    <Card className="bg-card shadow-sm group">
       <CardHeader className="pb-2 flex flex-row items-start justify-between space-y-0">
         <p className="text-base font-medium leading-tight pr-4">{item.original_text}</p>
-
         <Button
           variant="ghost"
           size="icon"
@@ -33,11 +43,40 @@ export function SentenceCard({ item, isPlaying, isLocked, onTogglePlay }: Senten
       </CardHeader>
 
       <CardContent>
-        <p className="text-sm text-muted-foreground">{item.translated_text}</p>
-        {item.source_context && (
-          <p className="text-[10px] text-muted-foreground/60 mt-3 text-right truncate">
-            {item.source_context}
-          </p>
+        {isEditing ? (
+          <SentenceEditForm
+            initialText={item.translated_text}
+            onSave={(newText) => onSaveEdit(item.id, newText).then(() => setIsEditing(false))}
+            onCancel={() => setIsEditing(false)}
+          />
+        ) : (
+          <div className="relative">
+            <p
+              className={`text-sm ${!item.translated_text ? "text-destructive italic" : "text-muted-foreground"}`}
+            >
+              {item.translated_text || "[ Translation Failed ]"}
+            </p>
+
+            <div className="flex items-end justify-between mt-3">
+              <div className="flex gap-1 opacity-0 focus-within:opacity-100 group-hover:opacity-100 transition-opacity">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => setIsEditing(true)}
+                  title="Manual Edit"
+                >
+                  <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                </Button>
+              </div>
+
+              {item.source_context && (
+                <p className="text-[10px] text-muted-foreground/60 text-right truncate max-w-[70%] ml-auto">
+                  {item.source_context}
+                </p>
+              )}
+            </div>
+          </div>
         )}
       </CardContent>
     </Card>
