@@ -6,13 +6,13 @@ use core_graphics::event::{
     CallbackResult,
 };
 use serde::Serialize;
-use std::process::Command;
 use std::sync::Mutex;
 use std::thread;
 use std::time::{Duration, Instant};
 use tauri::async_runtime::spawn;
 use tauri::{AppHandle, Emitter, Runtime};
-use tokio::time::sleep;
+use tokio::process::Command;
+use tokio::time::{sleep, timeout};
 
 /// represents kCGEventKeyDown
 const MAC_KEYDOWN_TYPE: u32 = 10;
@@ -76,7 +76,7 @@ fn handle_event<R: Runtime>(proxy: AppHandle<R>, event_type: CGEventType, event:
                 if let Ok(mut clipboard) = Clipboard::new()
                     && let Ok(text) = clipboard.get_text()
                 {
-                    let context = get_active_context();
+                    let context = get_active_context().await;
                     let payload = CapturePayload { text, context };
                     if let Err(e) = proxy_clone.emit(constants::EVENT_CAPTURE_TRIGGERED, payload) {
                         eprintln!("[capture] Failed to emit event to frontend: {}", e);
@@ -95,16 +95,30 @@ pub struct CapturePayload {
 
 /// Uses JS to get the frontmost application.
 /// If it's a browser, it attempts to grab the active tab's URL.
-fn get_active_context() -> Option<String> {
+///
+/// Runs `osascript` asynchronously via `tokio::process::Command` with a timeout so
+/// it never blocks the tokio runtime. On error or timeout, returns `None` as a default context.
+async fn get_active_context() -> Option<String> {
     let script = include_str!("scripts/get_active_context.js");
 
-    let output = Command::new("osascript")
+    let fut = Command::new("osascript")
         .arg("-l")
         .arg("JavaScript")
         .arg("-e")
         .arg(script)
-        .output()
-        .ok()?;
+        .output();
+
+    let output = match timeout(constants::OSASCRIPT_TIMEOUT, fut).await {
+        Ok(Ok(output)) => output,
+        Ok(Err(e)) => {
+            eprintln!("[capture] osascript failed: {}", e);
+            return None;
+        }
+        Err(_) => {
+            eprintln!("[capture] osascript timed out while reading active context");
+            return None;
+        }
+    };
 
     if output.status.success() {
         let result = String::from_utf8_lossy(&output.stdout).trim().to_string();
