@@ -51,7 +51,13 @@ export function usePronunciation() {
   // messaging so we don't double-toast for a single stop failure.
   const stopAudio = async () => {
     if (playingIdRef.current === null) return;
-    await invoke(IpcCommands.STOP_AUDIO);
+    try {
+      await invoke(IpcCommands.STOP_AUDIO);
+    } catch (err) {
+      // intentionally don't toast here to avoid double-toasting
+      console.error(err);
+      throw err;
+    }
     setPlaying(null);
   };
 

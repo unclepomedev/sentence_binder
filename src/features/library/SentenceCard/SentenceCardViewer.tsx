@@ -34,19 +34,28 @@ export function SentenceCardViewer({
   const handleDelete = async () => {
     if (isDeleting || deleteDisabled) return;
 
-    const isConfirmed = await confirm("Are you sure you want to delete this sentence?", {
-      title: "Delete Sentence",
-      kind: "warning",
-    });
-
-    if (!isConfirmed) return;
-
+    // Lock immediately to prevent parallel delete flows from concurrent clicks
+    // racing through the (async) confirm dialog before isDeleting is set.
     setIsDeleting(true);
     try {
+      let isConfirmed = false;
+      try {
+        isConfirmed = await confirm("Are you sure you want to delete this sentence?", {
+          title: "Delete Sentence",
+          kind: "warning",
+        });
+      } catch (err) {
+        console.error(err);
+        return;
+      }
+
+      if (!isConfirmed) return;
+
       if (isPlaying) {
         try {
           await onStopAudio();
-        } catch {
+        } catch (err) {
+          console.error(err);
           toast.error("Failed to stop audio playback. Deletion canceled.");
           return;
         }
