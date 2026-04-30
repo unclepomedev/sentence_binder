@@ -11,6 +11,8 @@ export const IpcCommands = {
   DELETE_API_KEY: "delete_api_key",
   SAVE_SENTENCE: "save_sentence",
   GET_SENTENCES: "get_sentences",
+  PLAY_PRONUNCIATION: "play_pronunciation",
+  STOP_AUDIO: "stop_audio",
 } as const;
 
 export type IpcCommand = (typeof IpcCommands)[keyof typeof IpcCommands];

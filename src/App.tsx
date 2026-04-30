@@ -1,14 +1,39 @@
+import { useQueryClient } from "@tanstack/react-query";
+import { invoke } from "@tauri-apps/api/core";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
 import { LibraryView } from "@/features/library/LibraryView";
-import { TestButton } from "@/features/library/TestButton";
 import { SettingsTest } from "@/features/settings/SettingsTest";
 import { useCapture } from "@/hooks/useCapture";
+import type { Sentence } from "@/types";
+import { IpcCommands } from "@/types/ipc";
 
 function App() {
+  const queryClient = useQueryClient();
+
   useCapture((capturedText) => {
-    toast.success("Text captured!", {
-      description: capturedText,
+    // TODO: make a constant
+    // Truncate the text for the toast preview so it doesn't take up the whole screen
+    const previewText = capturedText.length > 30 ? `${capturedText.slice(0, 30)}...` : capturedText;
+
+    const savePromise = invoke<Sentence>(IpcCommands.SAVE_SENTENCE, {
+      originalText: capturedText,
+      // TODO: pass null for now, unless have a way to grab the active window's title/URL
+      sourceContext: null,
+    });
+
+    toast.promise(savePromise, {
+      loading: `Translating: "${previewText}"`,
+      success: (newSentence) => {
+        queryClient.setQueryData(["sentences"], (old: Sentence[] | undefined) => {
+          return old ? [newSentence, ...old] : [newSentence];
+        });
+
+        return newSentence.translated_text.trim().length > 0
+          ? "Saved and translated successfully!"
+          : "Saved, but translation failed.";
+      },
+      error: (err) => `Failed to process: ${err instanceof Error ? err.message : String(err)}`,
     });
   });
 
@@ -20,7 +45,6 @@ function App() {
 
       {import.meta.env.DEV && (
         <div className="flex-none flex flex-col gap-4">
-          <TestButton />
           <SettingsTest />
         </div>
       )}

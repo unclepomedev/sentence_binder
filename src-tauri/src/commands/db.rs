@@ -1,23 +1,34 @@
 use crate::db;
+use crate::domain::engine::LlmEngine;
 use crate::error::AppError;
-use serde::Serialize;
+use crate::infrastructure::mlx::{MlxConfig, MlxEngine};
 use tauri::{State, command};
 
-/// record's ID (created on insertion).
-#[derive(Serialize)]
-pub struct IdResponse {
-    pub id: String,
-}
-
-/// Saves a newly captured sentence and its translation into the SQLite database.
+/// Saves a newly captured sentence into the SQLite database, performing translation simultaneously.
+/// If translation fails, the translation string will be left blank without stopping the process.
 #[command]
 pub async fn save_sentence(
     state: State<'_, db::DbState>,
     original_text: String,
-    translated_text: String,
     source_context: Option<String>,
-) -> Result<IdResponse, AppError> {
-    let id = db::insert_sentence(
+) -> Result<db::Sentence, AppError> {
+    let original_text = original_text.trim().to_string();
+    if original_text.is_empty() {
+        return Err(AppError::Validation(
+            "original_text cannot be empty".to_string(),
+        ));
+    }
+    let engine = MlxEngine::new(MlxConfig::default());
+
+    let translated_text = engine.translate(&original_text).await.unwrap_or_else(|e| {
+        eprintln!(
+            "[commands] Translation failed, saving original text anyway. Error: {}",
+            e
+        );
+        String::new()
+    });
+
+    let new_sentence = db::insert_sentence(
         &state.0,
         &original_text,
         &translated_text,
@@ -29,7 +40,7 @@ pub async fn save_sentence(
         AppError::Db(e)
     })?;
 
-    Ok(IdResponse { id })
+    Ok(new_sentence)
 }
 
 /// Fetches all saved sentences from the database for the Library view.

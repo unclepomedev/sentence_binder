@@ -1,9 +1,49 @@
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { invoke } from "@tauri-apps/api/core";
+import { useRef, useState } from "react";
+import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useSentences } from "@/hooks/useSentences";
+import { IpcCommands } from "@/types/ipc";
+import { SentenceCard } from "./SentenceCard";
 
 export function LibraryView() {
   const { sentences, isLoading, error } = useSentences();
+
+  // Track which sentence is currently being spoken by its ID:
+  //  if any audio is currently playing, block the click
+  const [playingId, setPlayingId] = useState<string | null>(null);
+  const playingIdRef = useRef<string | null>(null);
+
+  const setPlaying = (next: string | null) => {
+    playingIdRef.current = next;
+    setPlayingId(next);
+  };
+
+  const handleToggleAudio = async (id: string, text: string) => {
+    if (playingIdRef.current === id) {
+      setPlaying(null);
+      await invoke(IpcCommands.STOP_AUDIO);
+      return;
+    }
+    if (playingIdRef.current) return;
+    setPlaying(id);
+
+    try {
+      await invoke(IpcCommands.PLAY_PRONUNCIATION, { text });
+    } catch (err) {
+      // If the error happens while playingId is null, it means the user
+      // intentionally stopped it, so we suppress the error toast.
+      // If playingId is still set, it was a genuine failure.
+      if (playingIdRef.current === id) {
+        console.error(err);
+        toast.error("Failed to play audio");
+      }
+    } finally {
+      if (playingIdRef.current === id) {
+        setPlaying(null);
+      }
+    }
+  };
 
   return (
     <div className="flex flex-col h-full gap-4 overflow-hidden">
@@ -22,20 +62,15 @@ export function LibraryView() {
                 No sentences saved yet.
               </p>
             )}
+
             {sentences.map((item) => (
-              <Card key={item.id} className="bg-card shadow-sm">
-                <CardHeader className="pb-2">
-                  <p className="text-base font-medium leading-tight">{item.original_text}</p>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">{item.translated_text}</p>
-                  {item.source_context && (
-                    <p className="text-[10px] text-muted-foreground/60 mt-3 text-right uppercase tracking-wider">
-                      {item.source_context}
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
+              <SentenceCard
+                key={item.id}
+                item={item}
+                isPlaying={playingId === item.id}
+                isLocked={playingId !== null}
+                onTogglePlay={() => handleToggleAudio(item.id, item.original_text)}
+              />
             ))}
           </div>
         </ScrollArea>

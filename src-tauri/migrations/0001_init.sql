@@ -4,7 +4,6 @@ CREATE TABLE IF NOT EXISTS sentences
     original_text TEXT NOT NULL,
     translated_text TEXT NOT NULL,
     source_context TEXT,
-    audio_file_name TEXT,
     created_at INTEGER NOT NULL
 );
 

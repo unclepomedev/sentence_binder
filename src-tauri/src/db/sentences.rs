@@ -10,18 +10,17 @@ pub struct Sentence {
     pub original_text: String,
     pub translated_text: String,
     pub source_context: Option<String>,
-    pub audio_file_name: Option<String>,
     /// milliseconds
     pub created_at: i64,
 }
 
-/// Records a sentence and returns its UUID.
+/// Records a sentence and returns the record.
 pub async fn insert_sentence(
     pool: &SqlitePool,
     original_text: &str,
     translated_text: &str,
     source_context: Option<&str>,
-) -> Result<String, sqlx::Error> {
+) -> Result<Sentence, sqlx::Error> {
     let id = Uuid::new_v4().to_string();
     let now = Utc::now().timestamp_millis();
 
@@ -37,12 +36,18 @@ pub async fn insert_sentence(
     .execute(pool)
     .await?;
 
-    Ok(id)
+    Ok(Sentence {
+        id,
+        original_text: original_text.to_string(),
+        translated_text: translated_text.to_string(),
+        source_context: source_context.map(|s| s.to_string()),
+        created_at: now,
+    })
 }
 
 pub async fn fetch_all_sentences(pool: &SqlitePool) -> Result<Vec<Sentence>, sqlx::Error> {
     sqlx::query_as::<_, Sentence>(
-        "SELECT id, original_text, translated_text, source_context, audio_file_name, created_at
+        "SELECT id, original_text, translated_text, source_context, created_at
          FROM sentences
          ORDER BY created_at DESC, id DESC",
     )
@@ -106,16 +111,17 @@ mod tests {
         let translated = "これはテストです。";
         let context = Some("Google Chrome");
 
-        let id_result = insert_sentence(&pool, original, translated, context).await;
+        let sentence_result = insert_sentence(&pool, original, translated, context).await;
 
-        assert!(id_result.is_ok());
-        let id = id_result.unwrap();
-        assert_eq!(id.len(), 36); // UUID string length
+        assert!(sentence_result.is_ok());
+
+        let sentence = sentence_result.unwrap();
+        assert_eq!(sentence.id.len(), 36); // UUID string length
 
         // Verify the data was actually written to the DB
         let row: (String, String) =
             sqlx::query_as("SELECT original_text, translated_text FROM sentences WHERE id = ?")
-                .bind(&id)
+                .bind(&sentence.id)
                 .fetch_one(&pool)
                 .await
                 .expect("Failed to fetch inserted row");
