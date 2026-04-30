@@ -1,6 +1,7 @@
 import { confirm } from "@tauri-apps/plugin-dialog";
 import { Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
 interface SentenceCardViewerProps {
@@ -31,8 +32,7 @@ export function SentenceCardViewer({
   const deleteDisabled = (isLocked && !isPlaying) || isDeleting;
 
   const handleDelete = async () => {
-    if (isDeleting) return;
-    if (deleteDisabled) return;
+    if (isDeleting || deleteDisabled) return;
 
     const isConfirmed = await confirm("Are you sure you want to delete this sentence?", {
       title: "Delete Sentence",
@@ -47,18 +47,15 @@ export function SentenceCardViewer({
         try {
           await onStopAudio();
         } catch {
-          // If stopping fails, abort the delete so the user isn't left with a
-          // locked UI and a deleted record.
+          toast.error("Failed to stop audio playback. Deletion canceled.");
           return;
         }
       }
 
       try {
         await onDelete(id);
-      } catch (err) {
-        // Error is handled/toasted upstream in useDeleteSentence; log here
-        // to avoid an uncaught async error from the click handler.
-        console.error(err);
+      } catch {
+        // Handled/toasted upstream in useDeleteSentence
       }
     } finally {
       setIsDeleting(false);
