@@ -1,7 +1,6 @@
 import { confirm } from "@tauri-apps/plugin-dialog";
 import { Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
 interface SentenceCardViewerProps {
@@ -47,7 +46,8 @@ export function SentenceCardViewer({
         try {
           await onStopAudio();
         } catch {
-          toast.error("Failed to stop audio playback. Deletion canceled.");
+          // The audio hook already showed a "Failed to stop audio" toast.
+          // We just abort the deletion to prevent a locked UI.
           return;
         }
       }
