@@ -28,7 +28,7 @@ export function SentenceCard({ item, isPlaying, isLocked, onTogglePlay }: Senten
           ) : (
             <Volume2 className="h-4 w-4" />
           )}
-          <span className="sr-only">Toggle pronunciation</span>
+          <span className="sr-only">{isPlaying ? "Stop pronunciation" : "Play pronunciation"}</span>
         </Button>
       </CardHeader>
 

@@ -12,6 +12,12 @@ pub async fn save_sentence(
     original_text: String,
     source_context: Option<String>,
 ) -> Result<db::Sentence, AppError> {
+    let original_text = original_text.trim().to_string();
+    if original_text.is_empty() {
+        return Err(AppError::Validation(
+            "original_text cannot be empty".to_string(),
+        ));
+    }
     let engine = MlxEngine::new(MlxConfig::default());
 
     let translated_text = engine.translate(&original_text).await.unwrap_or_else(|e| {

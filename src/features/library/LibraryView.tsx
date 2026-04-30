@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useSentences } from "@/hooks/useSentences";
@@ -12,15 +12,21 @@ export function LibraryView() {
   // Track which sentence is currently being spoken by its ID:
   //  if any audio is currently playing, block the click
   const [playingId, setPlayingId] = useState<string | null>(null);
+  const playingIdRef = useRef<string | null>(null);
+
+  const setPlaying = (next: string | null) => {
+    playingIdRef.current = next;
+    setPlayingId(next);
+  };
 
   const handleToggleAudio = async (id: string, text: string) => {
-    if (playingId === id) {
-      setPlayingId(null);
+    if (playingIdRef.current === id) {
+      setPlaying(null);
       await invoke(IpcCommands.STOP_AUDIO);
       return;
     }
-    if (playingId) return;
-    setPlayingId(id);
+    if (playingIdRef.current) return;
+    setPlaying(id);
 
     try {
       await invoke(IpcCommands.PLAY_PRONUNCIATION, { text });
@@ -28,13 +34,14 @@ export function LibraryView() {
       // If the error happens while playingId is null, it means the user
       // intentionally stopped it, so we suppress the error toast.
       // If playingId is still set, it was a genuine failure.
-      if (playingId === id) {
+      if (playingIdRef.current === id) {
         console.error(err);
         toast.error("Failed to play audio");
       }
     } finally {
-      // Clean up state just in case it naturally finished
-      setPlayingId((prev) => (prev === id ? null : prev));
+      if (playingIdRef.current === id) {
+        setPlaying(null);
+      }
     }
   };
 

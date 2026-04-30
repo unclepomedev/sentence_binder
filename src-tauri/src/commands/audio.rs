@@ -1,13 +1,19 @@
 use crate::error::AppError;
 use std::process::Command;
+use tauri::async_runtime::spawn_blocking;
 use tauri::command;
 
 /// Plays the given text out loud using macOS's built-in TTS engine.
 #[command]
 pub async fn play_pronunciation(text: String) -> Result<(), AppError> {
-    let output = Command::new("say")
-        .arg(&text)
-        .output()
+    if text.trim().is_empty() {
+        return Err(AppError::Validation(
+            "Pronunciation text cannot be empty".to_string(),
+        ));
+    }
+    let output = spawn_blocking(move || Command::new("say").arg(text).output())
+        .await
+        .map_err(|e| AppError::Internal(format!("TTS task join failed: {}", e)))?
         .map_err(|e| AppError::Internal(format!("Failed to execute 'say' command: {}", e)))?;
 
     if !output.status.success() {

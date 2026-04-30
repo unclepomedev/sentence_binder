@@ -31,7 +31,7 @@ function App() {
 
         return "Saved and translated successfully!";
       },
-      error: (err) => `Failed to process: ${err}`,
+      error: (err) => `Failed to process: ${err instanceof Error ? err.message : String(err)}`,
     });
   });
 
