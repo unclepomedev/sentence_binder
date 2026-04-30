@@ -10,7 +10,7 @@ interface SentenceCardProps {
   isPlaying: boolean;
   isLocked: boolean;
   onTogglePlay: () => void;
-  onSaveEdit: (id: string, newText: string) => Promise<void>;
+  onSaveEdit: (id: string, newText: string, newContext: string | null) => Promise<void>;
 }
 
 export function SentenceCard({
@@ -46,7 +46,10 @@ export function SentenceCard({
         {isEditing ? (
           <SentenceEditForm
             initialText={item.translated_text}
-            onSave={(newText) => onSaveEdit(item.id, newText).then(() => setIsEditing(false))}
+            initialContext={item.source_context}
+            onSave={(newText, newContext) =>
+              onSaveEdit(item.id, newText, newContext).then(() => setIsEditing(false))
+            }
             onCancel={() => setIsEditing(false)}
           />
         ) : (
