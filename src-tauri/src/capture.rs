@@ -101,7 +101,9 @@ pub struct CapturePayload {
 async fn get_active_context() -> Option<String> {
     let script = include_str!("scripts/get_active_context.js");
 
-    let fut = Command::new("osascript")
+    let mut command = Command::new("osascript");
+    command.kill_on_drop(true);
+    let fut = command
         .arg("-l")
         .arg("JavaScript")
         .arg("-e")
