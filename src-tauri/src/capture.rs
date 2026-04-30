@@ -5,6 +5,8 @@ use core_graphics::event::{
     CGEvent, CGEventTap, CGEventTapLocation, CGEventTapOptions, CGEventTapPlacement, CGEventType,
     CallbackResult,
 };
+use serde::Serialize;
+use std::process::Command;
 use std::sync::Mutex;
 use std::thread;
 use std::time::{Duration, Instant};
@@ -74,11 +76,43 @@ fn handle_event<R: Runtime>(proxy: AppHandle<R>, event_type: CGEventType, event:
                 if let Ok(mut clipboard) = Clipboard::new()
                     && let Ok(text) = clipboard.get_text()
                 {
-                    let _ = proxy_clone.emit(constants::EVENT_CAPTURE_TRIGGERED, text);
+                    let context = get_active_context();
+                    let payload = CapturePayload { text, context };
+                    if let Err(e) = proxy_clone.emit(constants::EVENT_CAPTURE_TRIGGERED, payload) {
+                        eprintln!("[capture] Failed to emit event to frontend: {}", e);
+                    }
                 }
             });
         }
     }
+}
+
+#[derive(Clone, Serialize)]
+pub struct CapturePayload {
+    pub text: String,
+    pub context: Option<String>,
+}
+
+/// Uses JS to get the frontmost application.
+/// If it's a browser, it attempts to grab the active tab's URL.
+fn get_active_context() -> Option<String> {
+    let script = include_str!("scripts/get_active_context.js");
+
+    let output = Command::new("osascript")
+        .arg("-l")
+        .arg("JavaScript")
+        .arg("-e")
+        .arg(script)
+        .output()
+        .ok()?;
+
+    if output.status.success() {
+        let result = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if !result.is_empty() {
+            return Some(result);
+        }
+    }
+    None
 }
 
 /// Initializes a global macOS keyboard event monitor on a dedicated background thread.

@@ -8,18 +8,21 @@ import { useCapture } from "@/hooks/useCapture";
 import type { Sentence } from "@/types";
 import { IpcCommands } from "@/types/ipc";
 
+const MAX_TOAST_PREVIEW_LENGTH = 30;
+
 function App() {
   const queryClient = useQueryClient();
 
-  useCapture((capturedText) => {
-    // TODO: make a constant
+  useCapture(({ text, context }) => {
     // Truncate the text for the toast preview so it doesn't take up the whole screen
-    const previewText = capturedText.length > 30 ? `${capturedText.slice(0, 30)}...` : capturedText;
+    const previewText =
+      text.length > MAX_TOAST_PREVIEW_LENGTH
+        ? `${text.slice(0, MAX_TOAST_PREVIEW_LENGTH)}...`
+        : text;
 
     const savePromise = invoke<Sentence>(IpcCommands.SAVE_SENTENCE, {
-      originalText: capturedText,
-      // TODO: pass null for now, unless have a way to grab the active window's title/URL
-      sourceContext: null,
+      originalText: text,
+      sourceContext: context,
     });
 
     toast.promise(savePromise, {
