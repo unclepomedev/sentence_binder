@@ -92,6 +92,11 @@ pub async fn update_sentence_translation(
 /// Deletes a specific sentence from the database.
 #[command]
 pub async fn delete_sentence(state: State<'_, db::DbState>, id: String) -> Result<(), AppError> {
+    let id = id.trim().to_string();
+    if id.is_empty() {
+        return Err(AppError::Validation("invalid id".to_string()));
+    }
+
     db::delete_sentence(&state.0, &id)
         .await
         .map_err(|e| match e {

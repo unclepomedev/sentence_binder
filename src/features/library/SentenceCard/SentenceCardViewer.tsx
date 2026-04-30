@@ -1,5 +1,6 @@
 import { confirm } from "@tauri-apps/plugin-dialog";
 import { Pencil, Trash2 } from "lucide-react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 
 interface SentenceCardViewerProps {
@@ -26,9 +27,11 @@ export function SentenceCardViewer({
   // Disable delete while another card holds the audio lock to avoid orphaning
   // the only stop control. If this card is the one currently playing, stop
   // audio first so playback doesn't outlive the deleted record.
-  const deleteDisabled = isLocked && !isPlaying;
+  const [isDeleting, setIsDeleting] = useState(false);
+  const deleteDisabled = (isLocked && !isPlaying) || isDeleting;
 
   const handleDelete = async () => {
+    if (isDeleting) return;
     if (deleteDisabled) return;
 
     const isConfirmed = await confirm("Are you sure you want to delete this sentence?", {
@@ -38,21 +41,27 @@ export function SentenceCardViewer({
 
     if (!isConfirmed) return;
 
-    if (isPlaying) {
-      try {
-        await onStopAudio();
-      } catch {
-        // If stopping fails, abort the delete so the user isn't left with a
-        // locked UI and a deleted record.
-        return;
-      }
-    }
-
+    setIsDeleting(true);
     try {
-      await onDelete(id);
-    } catch {
-      // Error is handled/toasted upstream in useDeleteSentence; swallow here
-      // to avoid an uncaught async error from the click handler.
+      if (isPlaying) {
+        try {
+          await onStopAudio();
+        } catch {
+          // If stopping fails, abort the delete so the user isn't left with a
+          // locked UI and a deleted record.
+          return;
+        }
+      }
+
+      try {
+        await onDelete(id);
+      } catch (err) {
+        // Error is handled/toasted upstream in useDeleteSentence; log here
+        // to avoid an uncaught async error from the click handler.
+        console.error(err);
+      }
+    } finally {
+      setIsDeleting(false);
     }
   };
 
