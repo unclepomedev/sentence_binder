@@ -72,11 +72,12 @@ fn handle_event<R: Runtime>(proxy: AppHandle<R>, event_type: CGEventType, event:
         if is_double_tap {
             let proxy_clone = proxy.clone();
             spawn(async move {
-                sleep(constants::CLIPBOARD_READ_DELAY).await;
+                let context_fut = get_active_context();
+                let (_, context) =
+                    tokio::join!(sleep(constants::CLIPBOARD_READ_DELAY), context_fut);
                 if let Ok(mut clipboard) = Clipboard::new()
                     && let Ok(text) = clipboard.get_text()
                 {
-                    let context = get_active_context().await;
                     let payload = CapturePayload { text, context };
                     if let Err(e) = proxy_clone.emit(constants::EVENT_CAPTURE_TRIGGERED, payload) {
                         eprintln!("[capture] Failed to emit event to frontend: {}", e);
@@ -122,13 +123,33 @@ async fn get_active_context() -> Option<String> {
         }
     };
 
-    if output.status.success() {
-        let result = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        if !result.is_empty() {
-            return Some(result);
-        }
+    if !output.status.success() {
+        let code = output
+            .status
+            .code()
+            .map(|c| c.to_string())
+            .unwrap_or_else(|| "<no exit code>".to_string());
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        eprintln!(
+            "[capture] osascript exited with status {}: {}",
+            code,
+            stderr.trim()
+        );
+        return None;
     }
-    None
+
+    let result = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if result.is_empty() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if !stderr.trim().is_empty() {
+            eprintln!(
+                "[capture] osascript produced empty stdout; stderr: {}",
+                stderr.trim()
+            );
+        }
+        return None;
+    }
+    Some(result)
 }
 
 /// Initializes a global macOS keyboard event monitor on a dedicated background thread.
