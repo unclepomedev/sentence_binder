@@ -14,8 +14,17 @@ export function usePronunciation() {
 
   const toggleAudio = async (id: string, text: string) => {
     if (playingIdRef.current === id) {
-      setPlaying(null);
-      await invoke(IpcCommands.STOP_AUDIO);
+      try {
+        await invoke(IpcCommands.STOP_AUDIO);
+        // Only clear the playing state once the stop has succeeded, so the UI
+        // stays locked while the backend is still tearing down playback.
+        if (playingIdRef.current === id) {
+          setPlaying(null);
+        }
+      } catch (err) {
+        console.error(err);
+        toast.error("Failed to stop audio");
+      }
       return;
     }
 

@@ -15,8 +15,10 @@ export function SentenceEditForm({ initialText, onSave, onCancel }: SentenceEdit
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await onSave(draft);
+      await onSave(draft.trim());
     } catch {
+      // Error is handled/toasted upstream; just allow the user to retry.
+    } finally {
       setIsSaving(false);
     }
   };

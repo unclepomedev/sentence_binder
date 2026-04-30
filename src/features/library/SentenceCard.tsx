@@ -65,8 +65,10 @@ export function SentenceCard({
                   className="h-7 w-7"
                   onClick={() => setIsEditing(true)}
                   title="Manual Edit"
+                  aria-label="Edit sentence"
                 >
                   <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="sr-only">Edit sentence</span>
                 </Button>
               </div>
 

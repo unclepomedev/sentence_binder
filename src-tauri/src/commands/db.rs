@@ -59,6 +59,7 @@ pub async fn update_sentence_translation(
     id: String,
     new_translation: String,
 ) -> Result<(), AppError> {
+    let new_translation = new_translation.trim().to_string();
     db::update_translation(&state.0, &id, &new_translation)
         .await
         .map_err(|e| {

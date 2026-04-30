@@ -61,11 +61,15 @@ pub async fn update_translation(
     id: &str,
     new_translation: &str,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query("UPDATE sentences SET translated_text = ? WHERE id = ?")
+    let result = sqlx::query("UPDATE sentences SET translated_text = ? WHERE id = ?")
         .bind(new_translation)
         .bind(id)
         .execute(pool)
         .await?;
+
+    if result.rows_affected() == 0 {
+        return Err(sqlx::Error::RowNotFound);
+    }
     Ok(())
 }
 
@@ -193,5 +197,19 @@ mod tests {
 
         assert_eq!(row.0, original, "Original text should remain unchanged");
         assert_eq!(row.1, new_translation, "Translated text should be updated");
+    }
+
+    #[tokio::test]
+    async fn test_update_translation_unknown_id_returns_error() {
+        let pool = setup_in_memory_db().await;
+
+        let unknown_id = Uuid::new_v4().to_string();
+        let result = update_translation(&pool, &unknown_id, "any").await;
+
+        assert!(
+            matches!(result, Err(sqlx::Error::RowNotFound)),
+            "Expected RowNotFound for an unknown id, got: {:?}",
+            result
+        );
     }
 }
