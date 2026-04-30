@@ -29,7 +29,9 @@ function App() {
           return old ? [newSentence, ...old] : [newSentence];
         });
 
-        return "Saved and translated successfully!";
+        return newSentence.translated_text.trim().length > 0
+          ? "Saved and translated successfully!"
+          : "Saved, but translation failed.";
       },
       error: (err) => `Failed to process: ${err instanceof Error ? err.message : String(err)}`,
     });

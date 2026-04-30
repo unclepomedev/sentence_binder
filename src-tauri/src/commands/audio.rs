@@ -27,6 +27,9 @@ pub async fn play_pronunciation(text: String) -> Result<(), AppError> {
 /// Instantly stops any currently playing macOS TTS audio.
 #[command]
 pub async fn stop_audio() -> Result<(), AppError> {
-    let _ = Command::new("killall").arg("say").output();
+    spawn_blocking(|| Command::new("killall").arg("say").output())
+        .await
+        .map_err(|e| AppError::Internal(format!("Stop-audio task join failed: {}", e)))?
+        .map_err(|e| AppError::Internal(format!("Failed to execute 'killall': {}", e)))?;
     Ok(())
 }
