@@ -10,9 +10,11 @@ mod infrastructure;
 use apple_native_keyring_store::keychain::Store as AppleKeychainStore;
 
 use crate::commands::{
-    CredentialsState, delete_api_key, extract_usage, get_sentences, has_api_key, save_api_key,
-    save_sentence, translate_text,
+    CredentialsState, delete_api_key, extract_usage, get_sentences, has_api_key,
+    play_pronunciation, save_api_key, save_sentence, stop_audio,
 };
+use std::process::Command;
+use tauri::RunEvent;
 use tauri::async_runtime::block_on;
 use tauri::{Builder, Manager, generate_context, generate_handler};
 
@@ -55,8 +57,15 @@ pub fn run() {
             has_api_key,
             delete_api_key,
             extract_usage,
-            translate_text
+            play_pronunciation,
+            stop_audio
         ])
-        .run(generate_context!())
-        .expect("error while running tauri application");
+        .build(generate_context!())
+        .expect("error while building tauri application")
+        .run(|_app_handle, event| {
+            if let RunEvent::ExitRequested { .. } = event {
+                // Kill 'say' for audio feature
+                let _ = Command::new("killall").arg("say").output();
+            }
+        });
 }
