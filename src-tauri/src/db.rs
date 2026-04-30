@@ -1,6 +1,6 @@
 mod sentences;
 
-pub use sentences::{Sentence, fetch_all_sentences, insert_sentence};
+pub use sentences::{Sentence, fetch_all_sentences, insert_sentence, update_translation};
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions};
 use std::error::Error;
 use std::fs::create_dir_all;

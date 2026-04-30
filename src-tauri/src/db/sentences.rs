@@ -55,6 +55,24 @@ pub async fn fetch_all_sentences(pool: &SqlitePool) -> Result<Vec<Sentence>, sql
     .await
 }
 
+/// Updates the translated text of an existing sentence.
+pub async fn update_translation(
+    pool: &SqlitePool,
+    id: &str,
+    new_translation: &str,
+) -> Result<(), sqlx::Error> {
+    let result = sqlx::query("UPDATE sentences SET translated_text = ? WHERE id = ?")
+        .bind(new_translation)
+        .bind(id)
+        .execute(pool)
+        .await?;
+
+    if result.rows_affected() == 0 {
+        return Err(sqlx::Error::RowNotFound);
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -152,5 +170,46 @@ mod tests {
 
         assert_eq!(sentences[1].original_text, "First");
         assert_eq!(sentences[1].source_context, None);
+    }
+
+    #[tokio::test]
+    async fn test_update_translation() {
+        let pool = setup_in_memory_db().await;
+
+        let original = "I need an update.";
+        let initial_translated = "古い翻訳";
+
+        let sentence = insert_sentence(&pool, original, initial_translated, None)
+            .await
+            .expect("Failed to insert initial sentence");
+
+        let new_translation = "新しい翻訳";
+
+        let update_result = update_translation(&pool, &sentence.id, new_translation).await;
+        assert!(update_result.is_ok());
+
+        let row: (String, String) =
+            sqlx::query_as("SELECT original_text, translated_text FROM sentences WHERE id = ?")
+                .bind(&sentence.id)
+                .fetch_one(&pool)
+                .await
+                .expect("Failed to fetch updated row");
+
+        assert_eq!(row.0, original, "Original text should remain unchanged");
+        assert_eq!(row.1, new_translation, "Translated text should be updated");
+    }
+
+    #[tokio::test]
+    async fn test_update_translation_unknown_id_returns_error() {
+        let pool = setup_in_memory_db().await;
+
+        let unknown_id = Uuid::new_v4().to_string();
+        let result = update_translation(&pool, &unknown_id, "any").await;
+
+        assert!(
+            matches!(result, Err(sqlx::Error::RowNotFound)),
+            "Expected RowNotFound for an unknown id, got: {:?}",
+            result
+        );
     }
 }

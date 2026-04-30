@@ -11,7 +11,7 @@ use apple_native_keyring_store::keychain::Store as AppleKeychainStore;
 
 use crate::commands::{
     CredentialsState, delete_api_key, extract_usage, get_sentences, has_api_key,
-    play_pronunciation, save_api_key, save_sentence, stop_audio,
+    play_pronunciation, save_api_key, save_sentence, stop_audio, update_sentence_translation,
 };
 use std::process::Command;
 use tauri::RunEvent;
@@ -58,7 +58,8 @@ pub fn run() {
             delete_api_key,
             extract_usage,
             play_pronunciation,
-            stop_audio
+            stop_audio,
+            update_sentence_translation,
         ])
         .build(generate_context!())
         .expect("error while building tauri application")

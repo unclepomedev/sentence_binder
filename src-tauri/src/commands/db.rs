@@ -51,3 +51,24 @@ pub async fn get_sentences(state: State<'_, db::DbState>) -> Result<Vec<db::Sent
         AppError::Db(e)
     })
 }
+
+/// Updates the translation for a specific sentence.
+#[command]
+pub async fn update_sentence_translation(
+    state: State<'_, db::DbState>,
+    id: String,
+    new_translation: String,
+) -> Result<(), AppError> {
+    let new_translation = new_translation.trim().to_string();
+    db::update_translation(&state.0, &id, &new_translation)
+        .await
+        .map_err(|e| {
+            eprintln!(
+                "[commands] Database error in update_sentence_translation: {}",
+                e
+            );
+            AppError::Db(e)
+        })?;
+
+    Ok(())
+}

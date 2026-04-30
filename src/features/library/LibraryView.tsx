@@ -1,49 +1,13 @@
-import { invoke } from "@tauri-apps/api/core";
-import { useRef, useState } from "react";
-import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { usePronunciation } from "@/hooks/usePronunciation";
 import { useSentences } from "@/hooks/useSentences";
-import { IpcCommands } from "@/types/ipc";
+import { useUpdateTranslation } from "@/hooks/useUpdateTranslation";
 import { SentenceCard } from "./SentenceCard";
 
 export function LibraryView() {
   const { sentences, isLoading, error } = useSentences();
-
-  // Track which sentence is currently being spoken by its ID:
-  //  if any audio is currently playing, block the click
-  const [playingId, setPlayingId] = useState<string | null>(null);
-  const playingIdRef = useRef<string | null>(null);
-
-  const setPlaying = (next: string | null) => {
-    playingIdRef.current = next;
-    setPlayingId(next);
-  };
-
-  const handleToggleAudio = async (id: string, text: string) => {
-    if (playingIdRef.current === id) {
-      setPlaying(null);
-      await invoke(IpcCommands.STOP_AUDIO);
-      return;
-    }
-    if (playingIdRef.current) return;
-    setPlaying(id);
-
-    try {
-      await invoke(IpcCommands.PLAY_PRONUNCIATION, { text });
-    } catch (err) {
-      // If the error happens while playingId is null, it means the user
-      // intentionally stopped it, so we suppress the error toast.
-      // If playingId is still set, it was a genuine failure.
-      if (playingIdRef.current === id) {
-        console.error(err);
-        toast.error("Failed to play audio");
-      }
-    } finally {
-      if (playingIdRef.current === id) {
-        setPlaying(null);
-      }
-    }
-  };
+  const { playingId, toggleAudio } = usePronunciation();
+  const { updateTranslation } = useUpdateTranslation();
 
   return (
     <div className="flex flex-col h-full gap-4 overflow-hidden">
@@ -69,7 +33,8 @@ export function LibraryView() {
                 item={item}
                 isPlaying={playingId === item.id}
                 isLocked={playingId !== null}
-                onTogglePlay={() => handleToggleAudio(item.id, item.original_text)}
+                onTogglePlay={() => toggleAudio(item.id, item.original_text)}
+                onSaveEdit={updateTranslation}
               />
             ))}
           </div>
