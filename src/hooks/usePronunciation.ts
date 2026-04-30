@@ -46,16 +46,13 @@ export function usePronunciation() {
     }
   };
 
+  // Pure action: invokes STOP_AUDIO and clears playing state on success.
+  // On failure, simply rethrows; callers are responsible for any user-facing
+  // messaging so we don't double-toast for a single stop failure.
   const stopAudio = async () => {
     if (playingIdRef.current === null) return;
-    try {
-      await invoke(IpcCommands.STOP_AUDIO);
-      setPlaying(null);
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to stop audio");
-      throw err;
-    }
+    await invoke(IpcCommands.STOP_AUDIO);
+    setPlaying(null);
   };
 
   return { playingId, toggleAudio, stopAudio };
