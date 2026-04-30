@@ -19,6 +19,10 @@ pub enum AppError {
     #[error("Validation Error: {0}")]
     Validation(String),
 
+    /// Errors indicating that a requested record was not found
+    #[error("Not Found: {0}")]
+    NotFound(String),
+
     /// General fallback for unexpected system failures
     #[error("Internal Error: {0}")]
     Internal(String),

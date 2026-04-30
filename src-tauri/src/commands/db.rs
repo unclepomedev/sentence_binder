@@ -76,9 +76,19 @@ pub async fn update_sentence_translation(
             );
             match e {
                 sqlx::Error::RowNotFound => {
-                    AppError::Validation(format!("Sentence not found: {}", id))
+                    eprintln!(
+                        "[commands] update_sentence_translation: sentence not found: {}",
+                        id
+                    );
+                    AppError::NotFound(format!("Sentence not found: {}", id))
                 }
-                other => AppError::Db(other),
+                other => {
+                    eprintln!(
+                        "[commands] Database error in update_sentence_translation: {}",
+                        other
+                    );
+                    AppError::Db(other)
+                }
             }
         })?;
 
