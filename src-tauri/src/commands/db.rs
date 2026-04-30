@@ -69,26 +69,20 @@ pub async fn update_sentence_translation(
 
     db::update_translation(&state.0, &id, &new_translation, new_context)
         .await
-        .map_err(|e| {
-            eprintln!(
-                "[commands] Database error in update_sentence_translation: {}",
-                e
-            );
-            match e {
-                sqlx::Error::RowNotFound => {
-                    eprintln!(
-                        "[commands] update_sentence_translation: sentence not found: {}",
-                        id
-                    );
-                    AppError::NotFound(format!("Sentence not found: {}", id))
-                }
-                other => {
-                    eprintln!(
-                        "[commands] Database error in update_sentence_translation: {}",
-                        other
-                    );
-                    AppError::Db(other)
-                }
+        .map_err(|e| match e {
+            sqlx::Error::RowNotFound => {
+                eprintln!(
+                    "[commands] update_sentence_translation: sentence not found: {}",
+                    id
+                );
+                AppError::NotFound(format!("Sentence not found: {}", id))
+            }
+            other => {
+                eprintln!(
+                    "[commands] Database error in update_sentence_translation: {}",
+                    other
+                );
+                AppError::Db(other)
             }
         })?;
 
