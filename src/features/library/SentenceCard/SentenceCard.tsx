@@ -12,6 +12,7 @@ interface SentenceCardProps {
   onTogglePlay: () => void;
   onSaveEdit: (id: string, newText: string, newContext: string | null) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  onStopAudio: () => Promise<void>;
 }
 
 export function SentenceCard({
@@ -21,6 +22,7 @@ export function SentenceCard({
   onTogglePlay,
   onSaveEdit,
   onDelete,
+  onStopAudio,
 }: SentenceCardProps) {
   const [isEditing, setIsEditing] = useState(false);
 
@@ -48,8 +50,11 @@ export function SentenceCard({
             id={item.id}
             translatedText={item.translated_text}
             sourceContext={item.source_context}
+            isPlaying={isPlaying}
+            isLocked={isLocked}
             onEdit={() => setIsEditing(true)}
             onDelete={onDelete}
+            onStopAudio={onStopAudio}
           />
         )}
       </CardContent>

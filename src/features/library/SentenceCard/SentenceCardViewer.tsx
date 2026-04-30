@@ -6,26 +6,49 @@ interface SentenceCardViewerProps {
   id: string;
   translatedText: string;
   sourceContext: string | null;
+  isPlaying: boolean;
+  isLocked: boolean;
   onEdit: () => void;
   onDelete: (id: string) => Promise<void>;
+  onStopAudio: () => Promise<void>;
 }
 
 export function SentenceCardViewer({
   id,
   translatedText,
   sourceContext,
+  isPlaying,
+  isLocked,
   onEdit,
   onDelete,
+  onStopAudio,
 }: SentenceCardViewerProps) {
+  // Disable delete while another card holds the audio lock to avoid orphaning
+  // the only stop control. If this card is the one currently playing, stop
+  // audio first so playback doesn't outlive the deleted record.
+  const deleteDisabled = isLocked && !isPlaying;
+
   const handleDelete = async () => {
+    if (deleteDisabled) return;
+
     const isConfirmed = await confirm("Are you sure you want to delete this sentence?", {
       title: "Delete Sentence",
       kind: "warning",
     });
 
-    if (isConfirmed) {
-      await onDelete(id);
+    if (!isConfirmed) return;
+
+    if (isPlaying) {
+      try {
+        await onStopAudio();
+      } catch {
+        // If stopping fails, abort the delete so the user isn't left with a
+        // locked UI and a deleted record.
+        return;
+      }
     }
+
+    await onDelete(id);
   };
 
   return (
@@ -55,7 +78,10 @@ export function SentenceCardViewer({
             size="icon"
             className="h-7 w-7 text-muted-foreground hover:text-foreground transition-colors"
             onClick={handleDelete}
-            title="Delete Sentence"
+            disabled={deleteDisabled}
+            title={
+              deleteDisabled ? "Stop audio before deleting" : "Delete Sentence"
+            }
             aria-label="Delete sentence"
           >
             <Trash2 className="h-3.5 w-3.5" />

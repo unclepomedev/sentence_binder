@@ -46,5 +46,17 @@ export function usePronunciation() {
     }
   };
 
-  return { playingId, toggleAudio };
+  const stopAudio = async () => {
+    if (playingIdRef.current === null) return;
+    try {
+      await invoke(IpcCommands.STOP_AUDIO);
+      setPlaying(null);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to stop audio");
+      throw err;
+    }
+  };
+
+  return { playingId, toggleAudio, stopAudio };
 }

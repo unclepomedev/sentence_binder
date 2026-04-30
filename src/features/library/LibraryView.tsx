@@ -7,7 +7,7 @@ import { SentenceCard } from "./SentenceCard";
 
 export function LibraryView() {
   const { sentences, isLoading, error } = useSentences();
-  const { playingId, toggleAudio } = usePronunciation();
+  const { playingId, toggleAudio, stopAudio } = usePronunciation();
   const { updateTranslation } = useUpdateTranslation();
   const { deleteSentence } = useDeleteSentence();
 
@@ -38,6 +38,7 @@ export function LibraryView() {
                 onTogglePlay={() => toggleAudio(item.id, item.original_text)}
                 onSaveEdit={updateTranslation}
                 onDelete={deleteSentence}
+                onStopAudio={stopAudio}
               />
             ))}
           </div>
