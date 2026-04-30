@@ -35,7 +35,7 @@ export function SentenceCard({ item, isPlaying, isLocked, onTogglePlay }: Senten
       <CardContent>
         <p className="text-sm text-muted-foreground">{item.translated_text}</p>
         {item.source_context && (
-          <p className="text-[10px] text-muted-foreground/60 mt-3 text-right uppercase tracking-wider">
+          <p className="text-[10px] text-muted-foreground/60 mt-3 text-right truncate">
             {item.source_context}
           </p>
         )}

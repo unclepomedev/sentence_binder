@@ -1,8 +1,8 @@
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { useEffect, useRef } from "react";
-import { IpcEvents } from "@/types/ipc";
+import { type CapturePayload, IpcEvents } from "@/types/ipc";
 
-export function useCapture(onCapture: (text: string) => void) {
+export function useCapture(onCapture: (payload: CapturePayload) => void) {
   const onCaptureRef = useRef(onCapture);
 
   useEffect(() => {
@@ -13,10 +13,13 @@ export function useCapture(onCapture: (text: string) => void) {
     let unlistenPromise: Promise<UnlistenFn>;
 
     const setupListener = () => {
-      unlistenPromise = listen<string>(IpcEvents.CAPTURE_TRIGGERED, (event) => {
-        const text = event.payload.trim();
-        if (text) {
-          onCaptureRef.current(text);
+      unlistenPromise = listen<CapturePayload>(IpcEvents.CAPTURE_TRIGGERED, (event) => {
+        const payload = event.payload;
+        if (payload.text?.trim()) {
+          onCaptureRef.current({
+            text: payload.text.trim(),
+            context: payload.context,
+          });
         }
       });
     };
