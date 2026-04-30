@@ -48,7 +48,12 @@ export function SentenceCardViewer({
       }
     }
 
-    await onDelete(id);
+    try {
+      await onDelete(id);
+    } catch {
+      // Error is handled/toasted upstream in useDeleteSentence; swallow here
+      // to avoid an uncaught async error from the click handler.
+    }
   };
 
   return (
