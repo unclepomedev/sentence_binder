@@ -1,0 +1,1 @@
+export { SentenceCard } from "./SentenceCard";
