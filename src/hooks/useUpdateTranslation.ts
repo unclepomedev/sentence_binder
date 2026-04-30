@@ -7,15 +7,24 @@ import { IpcCommands } from "@/types/ipc";
 export function useUpdateTranslation() {
   const queryClient = useQueryClient();
 
-  const updateTranslation = async (id: string, newText: string) => {
+  const updateTranslation = async (id: string, newText: string, newContext: string | null) => {
     try {
       await invoke(IpcCommands.UPDATE_SENTENCE_TRANSLATION, {
         id,
         newTranslation: newText,
+        newContext,
       });
 
       queryClient.setQueryData(["sentences"], (old: Sentence[] | undefined) =>
-        old?.map((s) => (s.id === id ? { ...s, translated_text: newText } : s)),
+        old?.map((s) =>
+          s.id === id
+            ? {
+                ...s,
+                translated_text: newText,
+                source_context: newContext || null,
+              }
+            : s,
+        ),
       );
 
       toast.success("Translation updated");

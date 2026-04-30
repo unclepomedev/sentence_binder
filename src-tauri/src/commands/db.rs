@@ -52,15 +52,22 @@ pub async fn get_sentences(state: State<'_, db::DbState>) -> Result<Vec<db::Sent
     })
 }
 
-/// Updates the translation for a specific sentence.
+/// Updates the translation and context for a specific sentence.
 #[command]
 pub async fn update_sentence_translation(
     state: State<'_, db::DbState>,
     id: String,
     new_translation: String,
+    new_context: Option<String>,
 ) -> Result<(), AppError> {
     let new_translation = new_translation.trim().to_string();
-    db::update_translation(&state.0, &id, &new_translation)
+
+    let new_context = new_context
+        .as_deref()
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty());
+
+    db::update_translation(&state.0, &id, &new_translation, new_context)
         .await
         .map_err(|e| {
             eprintln!(

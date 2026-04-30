@@ -55,17 +55,20 @@ pub async fn fetch_all_sentences(pool: &SqlitePool) -> Result<Vec<Sentence>, sql
     .await
 }
 
-/// Updates the translated text of an existing sentence.
+/// Updates the translated text and context of an existing sentence.
 pub async fn update_translation(
     pool: &SqlitePool,
     id: &str,
     new_translation: &str,
+    new_context: Option<&str>,
 ) -> Result<(), sqlx::Error> {
-    let result = sqlx::query("UPDATE sentences SET translated_text = ? WHERE id = ?")
-        .bind(new_translation)
-        .bind(id)
-        .execute(pool)
-        .await?;
+    let result =
+        sqlx::query("UPDATE sentences SET translated_text = ?, source_context = ? WHERE id = ?")
+            .bind(new_translation)
+            .bind(new_context)
+            .bind(id)
+            .execute(pool)
+            .await?;
 
     if result.rows_affected() == 0 {
         return Err(sqlx::Error::RowNotFound);
@@ -184,19 +187,27 @@ mod tests {
             .expect("Failed to insert initial sentence");
 
         let new_translation = "新しい翻訳";
+        let new_context = Some("Updated Context");
 
-        let update_result = update_translation(&pool, &sentence.id, new_translation).await;
+        let update_result =
+            update_translation(&pool, &sentence.id, new_translation, new_context).await;
         assert!(update_result.is_ok());
 
-        let row: (String, String) =
-            sqlx::query_as("SELECT original_text, translated_text FROM sentences WHERE id = ?")
-                .bind(&sentence.id)
-                .fetch_one(&pool)
-                .await
-                .expect("Failed to fetch updated row");
+        let row: (String, String, Option<String>) = sqlx::query_as(
+            "SELECT original_text, translated_text, source_context FROM sentences WHERE id = ?",
+        )
+        .bind(&sentence.id)
+        .fetch_one(&pool)
+        .await
+        .expect("Failed to fetch updated row");
 
         assert_eq!(row.0, original, "Original text should remain unchanged");
         assert_eq!(row.1, new_translation, "Translated text should be updated");
+        assert_eq!(
+            row.2.as_deref(),
+            new_context,
+            "Source context should be updated"
+        );
     }
 
     #[tokio::test]
@@ -204,7 +215,7 @@ mod tests {
         let pool = setup_in_memory_db().await;
 
         let unknown_id = Uuid::new_v4().to_string();
-        let result = update_translation(&pool, &unknown_id, "any").await;
+        let result = update_translation(&pool, &unknown_id, "any", None).await;
 
         assert!(
             matches!(result, Err(sqlx::Error::RowNotFound)),
