@@ -17,6 +17,7 @@ use std::process::Command;
 use tauri::RunEvent;
 use tauri::async_runtime::block_on;
 use tauri::{Builder, Manager, generate_context, generate_handler};
+use std::sync::atomic::AtomicUsize;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -47,6 +48,7 @@ pub fn run() {
             app.manage(db::DbState(pool));
             app.manage(CredentialsState {
                 available: credentials_available,
+                consecutive_timeouts: AtomicUsize::new(0),
             });
             capture::setup_event_tap(app.handle().clone());
             Ok(())

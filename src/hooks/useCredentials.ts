@@ -57,15 +57,18 @@ export function useCredentials(provider: string = "openai") {
     setHasKey(null);
 
     // Failsafe timer: Unlocks the 'Retry' button if the timeout promise itself fails to fire.
+    // Capture the timer in a local so concurrent checks can't clear each other's timers
+    // via the shared ref (which would prevent `isStuck` from ever firing under rapid retries).
     if (stuckTimerRef.current !== null) {
       clearTimeout(stuckTimerRef.current);
     }
-    stuckTimerRef.current = setTimeout(() => {
+    const myStuckTimer = setTimeout(() => {
       if (!isMountedRef.current) return;
       if (requestIdRef.current === myRequestId) {
         setIsStuck(true);
       }
     }, CHECKING_STUCK_THRESHOLD_MS);
+    stuckTimerRef.current = myStuckTimer;
 
     try {
       const exists = await withTimeout(
@@ -87,8 +90,11 @@ export function useCredentials(provider: string = "openai") {
         setError(new Error(String(err)));
       }
     } finally {
-      if (stuckTimerRef.current !== null) {
-        clearTimeout(stuckTimerRef.current);
+      // Only clear the timer this request created. If a newer check has
+      // already replaced `stuckTimerRef.current`, leave it alone so its
+      // failsafe can still fire.
+      clearTimeout(myStuckTimer);
+      if (stuckTimerRef.current === myStuckTimer) {
         stuckTimerRef.current = null;
       }
       if (isMountedRef.current && requestIdRef.current === myRequestId) {
