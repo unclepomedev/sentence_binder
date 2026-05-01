@@ -1,7 +1,10 @@
 use crate::domain::models::Sentence;
 use chrono::Utc;
-use sqlx::SqlitePool;
+use sqlx::{QueryBuilder, Sqlite, SqlitePool};
 use uuid::Uuid;
+
+/// Safe chunk size for SQLite. (assert column_count * chunk_size <= 999)
+const BULK_INSERT_CHUNK_SIZE: usize = 100;
 
 /// sentences table
 #[derive(Debug, sqlx::FromRow)]
@@ -55,6 +58,35 @@ pub async fn insert_sentence(
         source_context: source_context.map(|s| s.to_string()),
         created_at: now,
     })
+}
+
+/// Inserts multiple sentences with chunking of [`BULK_INSERT_CHUNK_SIZE`]
+pub async fn insert_sentences_bulk(
+    pool: &SqlitePool,
+    sentences: &[Sentence],
+) -> Result<(), sqlx::Error> {
+    if sentences.is_empty() {
+        return Ok(());
+    }
+    let mut tx = pool.begin().await?;
+
+    for chunk in sentences.chunks(BULK_INSERT_CHUNK_SIZE) {
+        let mut query_builder: QueryBuilder<Sqlite> = QueryBuilder::new(
+            "INSERT INTO sentences (id, original_text, translated_text, source_context, created_at) ",
+        );
+        query_builder.push_values(chunk, |mut b, sentence| {
+            b.push_bind(&sentence.id)
+                .push_bind(&sentence.original_text)
+                .push_bind(&sentence.translated_text)
+                .push_bind(&sentence.source_context)
+                .push_bind(sentence.created_at);
+        });
+        let query = query_builder.build();
+        query.execute(&mut *tx).await?;
+    }
+
+    tx.commit().await?;
+    Ok(())
 }
 
 pub async fn fetch_all_sentences(pool: &SqlitePool) -> Result<Vec<Sentence>, sqlx::Error> {
@@ -280,6 +312,72 @@ mod tests {
             matches!(result, Err(sqlx::Error::RowNotFound)),
             "Expected RowNotFound for an unknown id, got: {:?}",
             result
+        );
+    }
+
+    #[tokio::test]
+    async fn test_insert_sentences_bulk_empty() {
+        let pool = setup_in_memory_db().await;
+        let sentences: Vec<Sentence> = vec![];
+
+        let result = insert_sentences_bulk(&pool, &sentences).await;
+        assert!(result.is_ok(), "Empty bulk insert should return Ok");
+
+        let fetched = fetch_all_sentences(&pool).await.unwrap();
+        assert_eq!(fetched.len(), 0, "Database should remain empty");
+    }
+
+    #[tokio::test]
+    async fn test_insert_sentences_bulk_small() {
+        let pool = setup_in_memory_db().await;
+
+        let sentences: Vec<Sentence> = (0..5)
+            .map(|i| Sentence {
+                id: Uuid::new_v4().to_string(),
+                original_text: format!("Original {}", i),
+                translated_text: format!("Translated {}", i),
+                source_context: Some(format!("Context {}", i)),
+                created_at: 1000 + i as i64,
+            })
+            .collect();
+
+        let result = insert_sentences_bulk(&pool, &sentences).await;
+        assert!(result.is_ok(), "Small bulk insert should succeed");
+
+        let fetched = fetch_all_sentences(&pool).await.unwrap();
+        assert_eq!(fetched.len(), 5, "All 5 sentences should be inserted");
+
+        let found = fetched
+            .iter()
+            .find(|s| s.original_text == "Original 3")
+            .unwrap();
+        assert_eq!(found.translated_text, "Translated 3");
+        assert_eq!(found.source_context.as_deref(), Some("Context 3"));
+    }
+
+    #[tokio::test]
+    async fn test_insert_sentences_bulk_large_chunking() {
+        let pool = setup_in_memory_db().await;
+        let total_sentences = 250;
+
+        let sentences: Vec<Sentence> = (0..total_sentences)
+            .map(|i| Sentence {
+                id: Uuid::new_v4().to_string(),
+                original_text: format!("Bulk Original {}", i),
+                translated_text: format!("Bulk Translated {}", i),
+                source_context: None,
+                created_at: Utc::now().timestamp_millis(),
+            })
+            .collect();
+
+        let result = insert_sentences_bulk(&pool, &sentences).await;
+        assert!(result.is_ok(), "Large chunked bulk insert should succeed");
+
+        let fetched = fetch_all_sentences(&pool).await.unwrap();
+        assert_eq!(
+            fetched.len(),
+            total_sentences as usize,
+            "All 250 sentences should be inserted"
         );
     }
 }

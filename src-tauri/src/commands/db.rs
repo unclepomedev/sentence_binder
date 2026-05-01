@@ -3,7 +3,9 @@ use crate::domain::engine::LlmEngine;
 use crate::domain::models::Sentence;
 use crate::error::AppError;
 use crate::infrastructure::mlx::{MlxConfig, MlxEngine};
-use tauri::{State, command};
+use std::fs;
+use tauri::{AppHandle, State, command};
+use tauri_plugin_dialog::DialogExt;
 
 /// Saves a newly captured sentence into the SQLite database, performing translation simultaneously.
 /// If translation fails, the translation string will be left blank without stopping the process.
@@ -112,4 +114,80 @@ pub async fn delete_sentence(state: State<'_, db::DbState>, id: String) -> Resul
         })?;
 
     Ok(())
+}
+
+/// Exports all sentences to a user-selected JSON file on their local disk.
+#[command]
+pub async fn export_sentences_json(
+    app: AppHandle,
+    state: State<'_, db::DbState>,
+) -> Result<(), AppError> {
+    let sentences = db::fetch_all_sentences(&state.0).await.map_err(|e| {
+        eprintln!("[commands] Database error in export_sentences_json: {}", e);
+        AppError::Db(e)
+    })?;
+
+    let file_path = app
+        .dialog()
+        .file()
+        .add_filter("JSON", &["json"])
+        .blocking_save_file();
+
+    let Some(path) = file_path else {
+        return Ok(()); // User canceled the dialog, return gracefully
+    };
+
+    let json_string = serde_json::to_string_pretty(&sentences).map_err(|e| {
+        eprintln!("[commands] JSON serialization error: {}", e);
+        AppError::Validation(format!("Failed to stringify data: {}", e))
+    })?;
+
+    fs::write(path.into_path().unwrap(), json_string).map_err(|e| {
+        eprintln!("[commands] File write error: {}", e);
+        AppError::Validation(format!("Failed to write file to disk: {}", e))
+    })?;
+
+    Ok(())
+}
+
+/// Imports sentences from a JSON file and inserts them into the database.
+/// Returns the number of successfully inserted sentences.
+#[command]
+pub async fn import_sentences_json(
+    app: AppHandle,
+    state: State<'_, db::DbState>,
+) -> Result<usize, AppError> {
+    let file_path = app
+        .dialog()
+        .file()
+        .add_filter("JSON", &["json"])
+        .blocking_pick_file();
+
+    let Some(path) = file_path else {
+        return Ok(0); // User canceled the dialog
+    };
+
+    let file_contents = fs::read_to_string(path.into_path().unwrap()).map_err(|e| {
+        eprintln!("[commands] File read error: {}", e);
+        AppError::Validation(format!("Failed to read file: {}", e))
+    })?;
+
+    let sentences: Vec<Sentence> = serde_json::from_str(&file_contents).map_err(|e| {
+        eprintln!("[commands] JSON parsing error: {}", e);
+        AppError::Validation(format!("Invalid JSON format: {}", e))
+    })?;
+
+    let count = sentences.len();
+    if count == 0 {
+        return Ok(0);
+    }
+
+    db::insert_sentences_bulk(&state.0, &sentences)
+        .await
+        .map_err(|e| {
+            eprintln!("[commands] Database error in import_sentences_json: {}", e);
+            AppError::Db(e)
+        })?;
+
+    Ok(count)
 }
