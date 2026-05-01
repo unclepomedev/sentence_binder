@@ -5,7 +5,7 @@ import { IpcCommands } from "@/types/ipc";
 // TODO: temporarily passing openai as provider. change it at a good time
 export function useCredentials(provider: string = "openai") {
   const [hasKey, setHasKey] = useState<boolean | null>(null);
-  const [error, setError] = useState<unknown>(null);
+  const [error, setError] = useState<Error | null>(null);
 
   const checkKeyStatus = useCallback(async () => {
     try {
@@ -14,7 +14,11 @@ export function useCredentials(provider: string = "openai") {
       setError(null);
     } catch (err) {
       console.error("[useCredentials] Failed to check key status:", err);
-      setError(err);
+      if (err instanceof Error) {
+        setError(err);
+      } else {
+        setError(new Error(String(err)));
+      }
     }
   }, [provider]);
 

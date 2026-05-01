@@ -47,9 +47,9 @@ function App() {
     <div className="h-screen w-screen bg-background font-sans antialiased flex overflow-hidden">
       <Sidebar currentView={currentView} onViewChange={setCurrentView} />
 
-      <main className="flex-1 min-w-0 p-6 h-full">
+      <div className="flex-1 min-w-0 p-6 h-full">
         {currentView === "library" ? <LibraryView /> : <SettingsView />}
-      </main>
+      </div>
 
       <Toaster />
     </div>
