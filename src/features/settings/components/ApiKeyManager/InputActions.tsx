@@ -49,7 +49,7 @@ export function InputActions({
           variant="outline"
           onClick={onDelete}
           disabled={!canDelete || busy}
-          className="hover:text-destructive hover:border-destructive transition-colors"
+          className="transition-colors"
         >
           {isDeleting ? <Loader2 className="animate-spin" /> : <Trash2 />}
           {isDeleting ? "Deleting..." : "Delete"}

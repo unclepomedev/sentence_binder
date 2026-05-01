@@ -22,7 +22,7 @@ export function ImportCard({ onImport, isImporting }: ImportCardProps) {
         <CardDescription>Restore sentences from a previous JSON backup.</CardDescription>
         <CardAction>
           <Button variant="outline" onClick={onImport} disabled={isImporting} className="w-36">
-            <Upload className="w-4 h-4 mr-2" />
+            <Upload />
             {isImporting ? "Importing..." : "Import JSON"}
           </Button>
         </CardAction>
