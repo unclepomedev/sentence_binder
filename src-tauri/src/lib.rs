@@ -14,10 +14,10 @@ use crate::commands::{
     play_pronunciation, save_api_key, save_sentence, stop_audio, update_sentence_translation,
 };
 use std::process::Command;
+use std::sync::atomic::AtomicUsize;
 use tauri::RunEvent;
 use tauri::async_runtime::block_on;
 use tauri::{Builder, Manager, generate_context, generate_handler};
-use std::sync::atomic::AtomicUsize;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
