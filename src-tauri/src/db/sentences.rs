@@ -146,6 +146,7 @@ pub async fn delete_sentence(pool: &SqlitePool, id: &str) -> Result<(), sqlx::Er
 mod tests {
     use super::*;
     use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
+    use std::slice;
 
     /// Inserts a sentence with a custom timestamp for deterministic sorting tests.
     async fn insert_sentence_at(
@@ -443,7 +444,7 @@ mod tests {
             created_at: 2000,
         };
 
-        insert_sentences_bulk(&pool, &vec![sentence_old.clone()])
+        insert_sentences_bulk(&pool, slice::from_ref(&sentence_old))
             .await
             .unwrap();
 
