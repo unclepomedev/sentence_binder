@@ -22,15 +22,10 @@ export function SentenceCardHeader({
         variant="ghost"
         size="icon"
         disabled={isLocked && !isPlaying}
-        className="h-8 w-8 text-muted-foreground hover:text-foreground shrink-0 transition-colors"
+        className="text-muted-foreground hover:text-foreground shrink-0 transition-colors"
         onClick={onTogglePlay}
       >
-        {isPlaying ? (
-          <Square className="h-4 w-4 fill-current text-foreground" />
-        ) : (
-          <Volume2 className="h-4 w-4" />
-        )}
-        <span className="sr-only">{isPlaying ? "Stop pronunciation" : "Play pronunciation"}</span>
+        {isPlaying ? <Square className="fill-current text-foreground" /> : <Volume2 />}
       </Button>
     </CardHeader>
   );
