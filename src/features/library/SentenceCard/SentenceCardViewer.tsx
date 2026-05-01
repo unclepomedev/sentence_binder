@@ -46,6 +46,7 @@ export function SentenceCardViewer({
         });
       } catch (err) {
         console.error(err);
+        toast.error("Failed to open delete confirmation");
         return;
       }
 
