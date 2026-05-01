@@ -2,14 +2,18 @@ use crate::credentials::{CredentialError, delete_key, has_key, save_key};
 use crate::domain::provider::LlmProvider;
 use crate::error::AppError;
 use std::fmt::Display;
+use std::time::Duration;
 use tauri::async_runtime::spawn_blocking;
 use tauri::{State, command};
+use tokio::time::timeout;
 
-/// Runtime flag indicating whether credential-related functionality is
-/// available. Set during startup based on whether the OS keychain store
-/// initialized successfully. When `available` is `false`, every credential
-/// command short-circuits with a uniform "Keychain unavailable" error so
-/// the frontend doesn't see ad-hoc keyring failure messages.
+/// Max duration for keychain operations. Accounts for legitimate OS TouchID/password
+/// prompts, but bounds the wait at 8s to prevent UI deadlocks if the OS keychain daemon hangs.
+const CREDENTIAL_OP_TIMEOUT: Duration = Duration::from_secs(8);
+const CREDENTIAL_OP_TIMED_OUT: &str = "Credential operation timed out";
+
+/// Runtime flag set during startup if the OS keychain initialized successfully.
+/// If false, credential commands safely short-circuit to prevent ad-hoc keyring errors.
 pub struct CredentialsState {
     pub available: bool,
 }
@@ -44,7 +48,18 @@ where
     T: Send + 'static,
     E: Display + Send + 'static,
 {
-    let result = spawn_blocking(f).await.map_err(|e| {
+    let join_handle = spawn_blocking(f);
+    let join_result = match timeout(CREDENTIAL_OP_TIMEOUT, join_handle).await {
+        Ok(r) => r,
+        Err(_) => {
+            eprintln!(
+                "[commands] {} credential operation timed out after {:?}",
+                op_name, CREDENTIAL_OP_TIMEOUT
+            );
+            return Err(AppError::Credential(CREDENTIAL_OP_TIMED_OUT.to_string()));
+        }
+    };
+    let result = join_result.map_err(|e| {
         eprintln!(
             "[commands] spawn_blocking join failed in {}: {}",
             op_name, e

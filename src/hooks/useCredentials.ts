@@ -4,6 +4,9 @@ import { IpcCommands } from "@/types/ipc";
 
 // Max wait for IPC response before failing (prevents UI hanging on silent IPC drops).
 const HAS_API_KEY_TIMEOUT_MS = 8000;
+// Save/delete keychain ops should also be bounded so a hung IPC can't leave
+// the form in an indefinite "Saving…"/"Deleting…" state.
+const MUTATION_TIMEOUT_MS = 10000;
 
 // Failsafe threshold: If `isChecking` remains true past this time, surface a
 // manual Retry path even before the IPC timeout fires. MUST be shorter than
@@ -110,20 +113,55 @@ export function useCredentials(provider: string = "openai") {
     };
   }, [checkKeyStatus]);
 
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const saveKey = async (key: string) => {
-    await invoke(IpcCommands.SAVE_API_KEY, { provider, key });
-    setHasKey(true);
-    setError(null);
-    // Re-verify keychain state in case the optimistic update drifts from OS reality.
-    void checkKeyStatus();
+    if (!isMountedRef.current) return;
+    setIsSaving(true);
+    try {
+      await withTimeout(
+        invoke(IpcCommands.SAVE_API_KEY, { provider, key }),
+        MUTATION_TIMEOUT_MS,
+        "Save API key",
+      );
+      if (!isMountedRef.current) return;
+      setHasKey(true);
+      setError(null);
+      // Re-verify keychain state in case the optimistic update drifts from OS reality.
+      void checkKeyStatus();
+    } finally {
+      if (isMountedRef.current) setIsSaving(false);
+    }
   };
 
   const deleteKey = async () => {
-    await invoke(IpcCommands.DELETE_API_KEY, { provider });
-    setHasKey(false);
-    setError(null);
-    void checkKeyStatus();
+    if (!isMountedRef.current) return;
+    setIsDeleting(true);
+    try {
+      await withTimeout(
+        invoke(IpcCommands.DELETE_API_KEY, { provider }),
+        MUTATION_TIMEOUT_MS,
+        "Delete API key",
+      );
+      if (!isMountedRef.current) return;
+      setHasKey(false);
+      setError(null);
+      void checkKeyStatus();
+    } finally {
+      if (isMountedRef.current) setIsDeleting(false);
+    }
   };
 
-  return { hasKey, isChecking, isStuck, error, saveKey, deleteKey, refresh: checkKeyStatus };
+  return {
+    hasKey,
+    isChecking,
+    isStuck,
+    error,
+    isSaving,
+    isDeleting,
+    saveKey,
+    deleteKey,
+    refresh: checkKeyStatus,
+  };
 }

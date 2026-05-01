@@ -10,7 +10,7 @@ interface ApiKeyManagerProps {
 }
 
 export function ApiKeyManager({ providerId, label }: ApiKeyManagerProps) {
-  const { hasKey, isChecking, isStuck, saveKey, deleteKey, error, refresh } =
+  const { hasKey, isChecking, isStuck, isSaving, isDeleting, saveKey, deleteKey, error, refresh } =
     useCredentials(providerId);
   const [inputValue, setInputValue] = useState("");
 
@@ -54,6 +54,8 @@ export function ApiKeyManager({ providerId, label }: ApiKeyManagerProps) {
         onSave={handleSave}
         onDelete={handleDelete}
         canDelete={!!hasKey}
+        isSaving={isSaving}
+        isDeleting={isDeleting}
       />
     </div>
   );
