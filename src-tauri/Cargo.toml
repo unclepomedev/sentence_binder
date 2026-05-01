@@ -32,3 +32,4 @@ apple-native-keyring-store = { version = "1.0.0", features = ["keychain"] }
 reqwest = { version = "0.13.3", features = ["json"] }
 serde_json = "1.0.149"
 thiserror = "2.0.18"
+tauri-plugin-dialog = "2"

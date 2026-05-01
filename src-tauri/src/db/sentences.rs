@@ -76,6 +76,20 @@ pub async fn update_translation(
     Ok(())
 }
 
+/// Deletes a sentence from the database by its ID.
+pub async fn delete_sentence(pool: &SqlitePool, id: &str) -> Result<(), sqlx::Error> {
+    let result = sqlx::query("DELETE FROM sentences WHERE id = ?")
+        .bind(id)
+        .execute(pool)
+        .await?;
+
+    if result.rows_affected() == 0 {
+        return Err(sqlx::Error::RowNotFound);
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -217,6 +231,36 @@ mod tests {
         let unknown_id = Uuid::new_v4().to_string();
         let result = update_translation(&pool, &unknown_id, "any", None).await;
 
+        assert!(
+            matches!(result, Err(sqlx::Error::RowNotFound)),
+            "Expected RowNotFound for an unknown id, got: {:?}",
+            result
+        );
+    }
+
+    #[tokio::test]
+    async fn test_delete_sentence() {
+        let pool = setup_in_memory_db().await;
+
+        let sentence = insert_sentence(&pool, "Delete me", "私を削除して", None)
+            .await
+            .expect("Failed to insert sentence");
+
+        let rows_before = fetch_all_sentences(&pool).await.unwrap();
+        assert_eq!(rows_before.len(), 1);
+
+        let delete_result = delete_sentence(&pool, &sentence.id).await;
+        assert!(delete_result.is_ok());
+
+        let rows_after = fetch_all_sentences(&pool).await.unwrap();
+        assert_eq!(rows_after.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_delete_sentence_unknown_id_returns_error() {
+        let pool = setup_in_memory_db().await;
+        let unknown_id = Uuid::new_v4().to_string();
+        let result = delete_sentence(&pool, &unknown_id).await;
         assert!(
             matches!(result, Err(sqlx::Error::RowNotFound)),
             "Expected RowNotFound for an unknown id, got: {:?}",
