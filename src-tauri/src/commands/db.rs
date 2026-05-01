@@ -117,6 +117,7 @@ pub async fn delete_sentence(state: State<'_, db::DbState>, id: String) -> Resul
 }
 
 /// Exports all sentences to a user-selected JSON file on their local disk.
+/// When the user canceled the dialog, it returns `Ok(())`.
 #[command]
 pub async fn export_sentences_json(
     app: AppHandle,
@@ -135,17 +136,20 @@ pub async fn export_sentences_json(
         .blocking_save_file();
 
     let Some(path) = file_path else {
-        return Ok(()); // User canceled the dialog, return gracefully
+        return Ok(());
     };
 
+    let path_buf = path
+        .into_path()
+        .map_err(|_| AppError::Validation("Unsupported file path format".into()))?;
     let json_string = serde_json::to_string_pretty(&sentences).map_err(|e| {
         eprintln!("[commands] JSON serialization error: {}", e);
-        AppError::Validation(format!("Failed to stringify data: {}", e))
+        AppError::Internal(format!("Failed to stringify data: {}", e))
     })?;
 
-    fs::write(path.into_path().unwrap(), json_string).map_err(|e| {
+    fs::write(path_buf, json_string).map_err(|e| {
         eprintln!("[commands] File write error: {}", e);
-        AppError::Validation(format!("Failed to write file to disk: {}", e))
+        AppError::Internal(format!("Failed to write file to disk: {}", e))
     })?;
 
     Ok(())
@@ -153,6 +157,7 @@ pub async fn export_sentences_json(
 
 /// Imports sentences from a JSON file and inserts them into the database.
 /// Returns the number of successfully inserted sentences.
+/// When the user canceled the dialog, it returns `Ok(0)`.
 #[command]
 pub async fn import_sentences_json(
     app: AppHandle,
@@ -165,12 +170,16 @@ pub async fn import_sentences_json(
         .blocking_pick_file();
 
     let Some(path) = file_path else {
-        return Ok(0); // User canceled the dialog
+        return Ok(0);
     };
 
-    let file_contents = fs::read_to_string(path.into_path().unwrap()).map_err(|e| {
+    let path_buf = path
+        .into_path()
+        .map_err(|_| AppError::Validation("Unsupported file path format".into()))?;
+
+    let file_contents = fs::read_to_string(path_buf).map_err(|e| {
         eprintln!("[commands] File read error: {}", e);
-        AppError::Validation(format!("Failed to read file: {}", e))
+        AppError::Internal(format!("Failed to read file: {}", e))
     })?;
 
     let sentences: Vec<Sentence> = serde_json::from_str(&file_contents).map_err(|e| {
@@ -178,17 +187,16 @@ pub async fn import_sentences_json(
         AppError::Validation(format!("Invalid JSON format: {}", e))
     })?;
 
-    let count = sentences.len();
-    if count == 0 {
+    if sentences.is_empty() {
         return Ok(0);
     }
 
-    db::insert_sentences_bulk(&state.0, &sentences)
+    let inserted_count = db::insert_sentences_bulk(&state.0, &sentences)
         .await
         .map_err(|e| {
             eprintln!("[commands] Database error in import_sentences_json: {}", e);
             AppError::Db(e)
         })?;
 
-    Ok(count)
+    Ok(inserted_count)
 }

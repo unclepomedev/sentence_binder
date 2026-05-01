@@ -61,13 +61,16 @@ pub async fn insert_sentence(
 }
 
 /// Inserts multiple sentences with chunking of [`BULK_INSERT_CHUNK_SIZE`]
+/// Skips duplicates based on the primary key `id`.
+/// Returns the number of successfully inserted rows.
 pub async fn insert_sentences_bulk(
     pool: &SqlitePool,
     sentences: &[Sentence],
-) -> Result<(), sqlx::Error> {
+) -> Result<usize, sqlx::Error> {
     if sentences.is_empty() {
-        return Ok(());
+        return Ok(0);
     }
+    let mut total_inserted = 0;
     let mut tx = pool.begin().await?;
 
     for chunk in sentences.chunks(BULK_INSERT_CHUNK_SIZE) {
@@ -81,12 +84,14 @@ pub async fn insert_sentences_bulk(
                 .push_bind(&sentence.source_context)
                 .push_bind(sentence.created_at);
         });
+        query_builder.push(" ON CONFLICT(id) DO NOTHING");
         let query = query_builder.build();
-        query.execute(&mut *tx).await?;
+        let result = query.execute(&mut *tx).await?;
+        total_inserted += result.rows_affected() as usize;
     }
 
     tx.commit().await?;
-    Ok(())
+    Ok(total_inserted)
 }
 
 pub async fn fetch_all_sentences(pool: &SqlitePool) -> Result<Vec<Sentence>, sqlx::Error> {
@@ -379,5 +384,81 @@ mod tests {
             total_sentences as usize,
             "All 250 sentences should be inserted"
         );
+    }
+
+    #[tokio::test]
+    async fn test_insert_sentences_bulk_skips_full_duplicates() {
+        let pool = setup_in_memory_db().await;
+
+        let sentence1 = Sentence {
+            id: Uuid::new_v4().to_string(),
+            original_text: "Existing 1".to_string(),
+            translated_text: "Trans 1".to_string(),
+            source_context: None,
+            created_at: 1000,
+        };
+        let sentence2 = Sentence {
+            id: Uuid::new_v4().to_string(),
+            original_text: "Existing 2".to_string(),
+            translated_text: "Trans 2".to_string(),
+            source_context: None,
+            created_at: 2000,
+        };
+
+        let batch = vec![sentence1.clone(), sentence2.clone()];
+
+        let first_insert_count = insert_sentences_bulk(&pool, &batch).await.unwrap();
+        assert_eq!(first_insert_count, 2, "First insert should add 2 rows");
+
+        let second_insert_count = insert_sentences_bulk(&pool, &batch).await.unwrap();
+        assert_eq!(
+            second_insert_count, 0,
+            "Second insert should skip all duplicates and return 0"
+        );
+
+        let fetched = fetch_all_sentences(&pool).await.unwrap();
+        assert_eq!(
+            fetched.len(),
+            2,
+            "Database should still only have 2 sentences total"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_insert_sentences_bulk_partial_duplicates() {
+        let pool = setup_in_memory_db().await;
+
+        let sentence_old = Sentence {
+            id: Uuid::new_v4().to_string(),
+            original_text: "Old Sentence".to_string(),
+            translated_text: "Old Trans".to_string(),
+            source_context: None,
+            created_at: 1000,
+        };
+        let sentence_new = Sentence {
+            id: Uuid::new_v4().to_string(),
+            original_text: "New Sentence".to_string(),
+            translated_text: "New Trans".to_string(),
+            source_context: None,
+            created_at: 2000,
+        };
+
+        insert_sentences_bulk(&pool, &vec![sentence_old.clone()])
+            .await
+            .unwrap();
+
+        let mixed_batch = vec![sentence_old.clone(), sentence_new.clone()];
+
+        let mixed_insert_count = insert_sentences_bulk(&pool, &mixed_batch).await.unwrap();
+        assert_eq!(
+            mixed_insert_count, 1,
+            "Should insert 1 new sentence and skip 1 duplicate"
+        );
+
+        let fetched = fetch_all_sentences(&pool).await.unwrap();
+        assert_eq!(fetched.len(), 2, "Database should have exactly 2 sentences");
+
+        assert!(fetched.iter().any(|s| s.id == sentence_old.id));
+        assert!(fetched.iter().any(|s| s.id == sentence_new.id));
     }
 }

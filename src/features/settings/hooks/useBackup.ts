@@ -10,6 +10,8 @@ export function useBackup() {
   const [isImporting, setIsImporting] = useState(false);
 
   const exportData = async () => {
+    if (isExporting) return;
+
     setIsExporting(true);
     try {
       await invoke(IpcCommands.EXPORT_SENTENCES_JSON);
@@ -24,12 +26,16 @@ export function useBackup() {
   };
 
   const importData = async () => {
+    if (isImporting) return;
+
     setIsImporting(true);
     try {
       const count = await invoke<number>(IpcCommands.IMPORT_SENTENCES_JSON);
       if (count > 0) {
         toast.success(`Successfully imported ${count} sentences`);
         void queryClient.invalidateQueries({ queryKey: ["sentences"] });
+      } else {
+        toast.info("No new sentences were imported (all duplicates skipped).");
       }
     } catch (err) {
       console.error(err);
