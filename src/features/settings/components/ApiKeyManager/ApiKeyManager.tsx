@@ -10,7 +10,7 @@ interface ApiKeyManagerProps {
 }
 
 export function ApiKeyManager({ providerId, label }: ApiKeyManagerProps) {
-  const { hasKey, saveKey, deleteKey, error } = useCredentials(providerId);
+  const { hasKey, saveKey, deleteKey, error, refresh } = useCredentials(providerId);
   const [inputValue, setInputValue] = useState("");
 
   const handleSave = async () => {
@@ -21,7 +21,8 @@ export function ApiKeyManager({ providerId, label }: ApiKeyManagerProps) {
       toast.success(`${label} Key saved securely.`);
       setInputValue("");
     } catch (err) {
-      toast.error(`Failed to save: ${err}`);
+      const message = err instanceof Error ? err.message : String(err);
+      toast.error(`Failed to save: ${message}`);
     }
   };
 
@@ -30,20 +31,21 @@ export function ApiKeyManager({ providerId, label }: ApiKeyManagerProps) {
       await deleteKey();
       toast.info(`${label} Key removed.`);
     } catch (err) {
-      toast.error(`Failed to delete: ${err}`);
+      const message = err instanceof Error ? err.message : String(err);
+      toast.error(`Failed to delete: ${message}`);
     }
   };
 
   return (
     <div className="space-y-4">
-      <StatusIndicator error={error} hasKey={hasKey} label={label} />
+      <StatusIndicator error={error} hasKey={hasKey} label={label} onRetry={refresh} />
 
       <InputActions
         inputValue={inputValue}
         onInputChange={setInputValue}
         onSave={handleSave}
         onDelete={handleDelete}
-        canDelete={!!hasKey && !error}
+        canDelete={!!hasKey}
       />
     </div>
   );

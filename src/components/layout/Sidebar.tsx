@@ -17,6 +17,7 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
         className="h-10 w-10 rounded-xl"
         onClick={() => onViewChange("library")}
         title="Library"
+        aria-pressed={currentView === "library"}
       >
         <BookOpen className="h-5 w-5" />
         <span className="sr-only">Library</span>
@@ -28,6 +29,7 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
         className="h-10 w-10 rounded-xl"
         onClick={() => onViewChange("settings")}
         title="Settings"
+        aria-pressed={currentView === "settings"}
       >
         <Settings className="h-5 w-5" />
         <span className="sr-only">Settings</span>

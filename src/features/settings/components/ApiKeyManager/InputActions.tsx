@@ -23,6 +23,14 @@ export function InputActions({
         value={inputValue}
         onChange={(e) => onInputChange(e.target.value)}
         placeholder="sk-..."
+        aria-label="API key"
+        autoComplete="new-password"
+        spellCheck={false}
+        autoCorrect="off"
+        autoCapitalize="none"
+        data-1p-ignore
+        data-lpignore="true"
+        data-form-type="other"
         className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-primary"
       />
       <div className="flex gap-2">

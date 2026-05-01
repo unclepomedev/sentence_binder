@@ -38,5 +38,5 @@ export function useCredentials(provider: string = "openai") {
     setError(null);
   };
 
-  return { hasKey, error, saveKey, deleteKey };
+  return { hasKey, error, saveKey, deleteKey, refresh: checkKeyStatus };
 }
