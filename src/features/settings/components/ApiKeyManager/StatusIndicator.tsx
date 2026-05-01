@@ -4,10 +4,10 @@ import { Button } from "@/components/ui/button";
 interface StatusIndicatorProps {
   error: Error | null;
   hasKey: boolean | null;
-  isChecking?: boolean;
-  isStuck?: boolean;
+  isChecking: boolean;
+  isStuck: boolean;
   label: string;
-  onRetry?: () => void | Promise<void>;
+  onRetry: () => void | Promise<void>;
 }
 
 export function StatusIndicator({
@@ -28,7 +28,7 @@ export function StatusIndicator({
 
   // Guarantee the user is never trapped in a permanent "Checking..." state due to
   // an IPC error, a bypassed timeout, or a stalled JS thread.
-  const showRetry = !!onRetry && (!!error || (hasKey === null && !isChecking) || !!isStuck);
+  const showRetry = !!error || (hasKey === null && !isChecking) || isStuck;
 
   return (
     <div className="flex items-center gap-3 p-3 rounded-md bg-muted/50 border border-border/50">
@@ -53,7 +53,7 @@ export function StatusIndicator({
         )}
       </span>
       {showRetry && (
-        <Button size="sm" variant="outline" className="ml-auto" onClick={() => onRetry?.()}>
+        <Button size="sm" variant="outline" className="ml-auto" onClick={() => onRetry()}>
           Retry
         </Button>
       )}

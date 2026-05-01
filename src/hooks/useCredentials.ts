@@ -5,9 +5,11 @@ import { IpcCommands } from "@/types/ipc";
 // Max wait for IPC response before failing (prevents UI hanging on silent IPC drops).
 const HAS_API_KEY_TIMEOUT_MS = 8000;
 
-// Failsafe threshold: If `isChecking` remains true past this time, we assume
-// the event loop or Tauri backend is permanently stalled and allow a manual retry.
-const CHECKING_STUCK_THRESHOLD_MS = 10000;
+// Failsafe threshold: If `isChecking` remains true past this time, surface a
+// manual Retry path even before the IPC timeout fires. MUST be shorter than
+// `HAS_API_KEY_TIMEOUT_MS`, otherwise `withTimeout` always rejects first and
+// `isStuck` is unreachable in practice.
+const CHECKING_STUCK_THRESHOLD_MS = 4000;
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
@@ -37,14 +39,23 @@ export function useCredentials(provider: string = "openai") {
   // Monotonic ID to prevent race conditions. If a user clicks retry, we increment
   // this and ignore late-resolving promises from previous in-flight checks.
   const requestIdRef = useRef(0);
+  const stuckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Prevents late-resolving IPC calls or timers from triggering state updates after unmount.
+  const isMountedRef = useRef(true);
 
   const checkKeyStatus = useCallback(async () => {
     const myRequestId = ++requestIdRef.current;
+    if (!isMountedRef.current) return;
     setIsChecking(true);
     setIsStuck(false);
+    setError(null);
 
     // Failsafe timer: Unlocks the 'Retry' button if the timeout promise itself fails to fire.
-    const stuckTimer = setTimeout(() => {
+    if (stuckTimerRef.current !== null) {
+      clearTimeout(stuckTimerRef.current);
+    }
+    stuckTimerRef.current = setTimeout(() => {
+      if (!isMountedRef.current) return;
       if (requestIdRef.current === myRequestId) {
         setIsStuck(true);
       }
@@ -56,10 +67,12 @@ export function useCredentials(provider: string = "openai") {
         HAS_API_KEY_TIMEOUT_MS,
         "Key status check",
       );
+      if (!isMountedRef.current) return;
       if (requestIdRef.current !== myRequestId) return;
       setHasKey(exists);
       setError(null);
     } catch (err) {
+      if (!isMountedRef.current) return;
       if (requestIdRef.current !== myRequestId) return;
       console.error("[useCredentials] Failed to check key status:", err);
       if (err instanceof Error) {
@@ -68,8 +81,11 @@ export function useCredentials(provider: string = "openai") {
         setError(new Error(String(err)));
       }
     } finally {
-      clearTimeout(stuckTimer);
-      if (requestIdRef.current === myRequestId) {
+      if (stuckTimerRef.current !== null) {
+        clearTimeout(stuckTimerRef.current);
+        stuckTimerRef.current = null;
+      }
+      if (isMountedRef.current && requestIdRef.current === myRequestId) {
         setIsChecking(false);
         setIsStuck(false);
       }
@@ -77,7 +93,17 @@ export function useCredentials(provider: string = "openai") {
   }, [provider]);
 
   useEffect(() => {
+    isMountedRef.current = true;
     void checkKeyStatus();
+    return () => {
+      // Cleanup: mark unmounted and clear timers to prevent memory leaks or zombie state updates.
+      isMountedRef.current = false;
+      requestIdRef.current++;
+      if (stuckTimerRef.current !== null) {
+        clearTimeout(stuckTimerRef.current);
+        stuckTimerRef.current = null;
+      }
+    };
   }, [checkKeyStatus]);
 
   const saveKey = async (key: string) => {
