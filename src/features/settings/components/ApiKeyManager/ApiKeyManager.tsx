@@ -10,7 +10,8 @@ interface ApiKeyManagerProps {
 }
 
 export function ApiKeyManager({ providerId, label }: ApiKeyManagerProps) {
-  const { hasKey, isChecking, saveKey, deleteKey, error, refresh } = useCredentials(providerId);
+  const { hasKey, isChecking, isStuck, saveKey, deleteKey, error, refresh } =
+    useCredentials(providerId);
   const [inputValue, setInputValue] = useState("");
 
   const handleSave = async () => {
@@ -42,6 +43,7 @@ export function ApiKeyManager({ providerId, label }: ApiKeyManagerProps) {
         error={error}
         hasKey={hasKey}
         isChecking={isChecking}
+        isStuck={isStuck}
         label={label}
         onRetry={refresh}
       />

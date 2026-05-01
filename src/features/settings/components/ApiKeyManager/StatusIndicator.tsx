@@ -5,6 +5,7 @@ interface StatusIndicatorProps {
   error: Error | null;
   hasKey: boolean | null;
   isChecking?: boolean;
+  isStuck?: boolean;
   label: string;
   onRetry?: () => void | Promise<void>;
 }
@@ -13,6 +14,7 @@ export function StatusIndicator({
   error,
   hasKey,
   isChecking,
+  isStuck,
   label,
   onRetry,
 }: StatusIndicatorProps) {
@@ -28,7 +30,10 @@ export function StatusIndicator({
   // still in the indeterminate `hasKey === null` state without an active
   // in-flight check (e.g. an IPC hang that bypassed our timeout). This
   // guarantees the user is never stuck on "Checking..." with no escape.
-  const showRetry = !!onRetry && (!!error || (hasKey === null && !isChecking));
+  // Also offer Retry when a check has been running long enough to be
+  // considered stuck (e.g. JS-thread stall preventing timers from firing),
+  // so the user is never trapped on "Checking..." with no recourse.
+  const showRetry = !!onRetry && (!!error || (hasKey === null && !isChecking) || !!isStuck);
 
   return (
     <div className="flex items-center gap-3 p-3 rounded-md bg-muted/50 border border-border/50">
