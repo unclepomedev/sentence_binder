@@ -1,5 +1,6 @@
 use crate::db;
 use crate::domain::engine::LlmEngine;
+use crate::domain::models::Sentence;
 use crate::error::AppError;
 use crate::infrastructure::mlx::{MlxConfig, MlxEngine};
 use tauri::{State, command};
@@ -11,7 +12,7 @@ pub async fn save_sentence(
     state: State<'_, db::DbState>,
     original_text: String,
     source_context: Option<String>,
-) -> Result<db::Sentence, AppError> {
+) -> Result<Sentence, AppError> {
     let original_text = original_text.trim().to_string();
     if original_text.is_empty() {
         return Err(AppError::Validation(
@@ -45,7 +46,7 @@ pub async fn save_sentence(
 
 /// Fetches all saved sentences from the database for the Library view.
 #[command]
-pub async fn get_sentences(state: State<'_, db::DbState>) -> Result<Vec<db::Sentence>, AppError> {
+pub async fn get_sentences(state: State<'_, db::DbState>) -> Result<Vec<Sentence>, AppError> {
     db::fetch_all_sentences(&state.0).await.map_err(|e| {
         eprintln!("[commands] Database error in get_sentences: {}", e);
         AppError::Db(e)

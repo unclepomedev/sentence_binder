@@ -1,17 +1,29 @@
+use crate::domain::models::Sentence;
 use chrono::Utc;
-use serde::Serialize;
 use sqlx::SqlitePool;
 use uuid::Uuid;
 
 /// sentences table
-#[derive(Debug, sqlx::FromRow, Serialize)]
-pub struct Sentence {
+#[derive(Debug, sqlx::FromRow)]
+struct SentenceRow {
     pub id: String,
     pub original_text: String,
     pub translated_text: String,
     pub source_context: Option<String>,
     /// milliseconds
     pub created_at: i64,
+}
+
+impl From<SentenceRow> for Sentence {
+    fn from(row: SentenceRow) -> Self {
+        Self {
+            id: row.id,
+            original_text: row.original_text,
+            translated_text: row.translated_text,
+            source_context: row.source_context,
+            created_at: row.created_at,
+        }
+    }
 }
 
 /// Records a sentence and returns the record.
@@ -46,13 +58,16 @@ pub async fn insert_sentence(
 }
 
 pub async fn fetch_all_sentences(pool: &SqlitePool) -> Result<Vec<Sentence>, sqlx::Error> {
-    sqlx::query_as::<_, Sentence>(
+    let rows = sqlx::query_as::<_, SentenceRow>(
         "SELECT id, original_text, translated_text, source_context, created_at
          FROM sentences
          ORDER BY created_at DESC, id DESC",
     )
     .fetch_all(pool)
-    .await
+    .await?;
+
+    let sentences = rows.into_iter().map(Sentence::from).collect();
+    Ok(sentences)
 }
 
 /// Updates the translated text and context of an existing sentence.
