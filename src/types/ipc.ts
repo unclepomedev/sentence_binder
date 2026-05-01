@@ -21,6 +21,8 @@ export const IpcCommands = {
   STOP_AUDIO: "stop_audio",
   UPDATE_SENTENCE_TRANSLATION: "update_sentence_translation",
   DELETE_SENTENCE: "delete_sentence",
+  EXPORT_SENTENCES_JSON: "export_sentences_json",
+  IMPORT_SENTENCES_JSON: "import_sentences_json",
 } as const;
 
 export type IpcCommand = (typeof IpcCommands)[keyof typeof IpcCommands];

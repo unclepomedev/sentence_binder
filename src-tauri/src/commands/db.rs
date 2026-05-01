@@ -131,6 +131,7 @@ pub async fn export_sentences_json(
         .dialog()
         .file()
         .add_filter("JSON", &["json"])
+        .set_file_name("sentences_backup.json")
         .blocking_save_file();
 
     let Some(path) = file_path else {

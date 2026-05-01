@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { toast } from "sonner";
-import { useCredentials } from "@/hooks/useCredentials";
+import { useCredentials } from "../../hooks/useCredentials";
 import { InputActions } from "./InputActions";
 import { StatusIndicator } from "./StatusIndicator";
 
