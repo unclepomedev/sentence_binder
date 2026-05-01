@@ -4,11 +4,18 @@ import { Button } from "@/components/ui/button";
 interface StatusIndicatorProps {
   error: Error | null;
   hasKey: boolean | null;
+  isChecking?: boolean;
   label: string;
   onRetry?: () => void | Promise<void>;
 }
 
-export function StatusIndicator({ error, hasKey, label, onRetry }: StatusIndicatorProps) {
+export function StatusIndicator({
+  error,
+  hasKey,
+  isChecking,
+  label,
+  onRetry,
+}: StatusIndicatorProps) {
   const dotColor = error
     ? "bg-destructive"
     : hasKey === null
@@ -16,6 +23,12 @@ export function StatusIndicator({ error, hasKey, label, onRetry }: StatusIndicat
       : hasKey
         ? "bg-green-500"
         : "bg-destructive";
+
+  // Show Retry whenever the check has produced an error OR whenever we are
+  // still in the indeterminate `hasKey === null` state without an active
+  // in-flight check (e.g. an IPC hang that bypassed our timeout). This
+  // guarantees the user is never stuck on "Checking..." with no escape.
+  const showRetry = !!onRetry && (!!error || (hasKey === null && !isChecking));
 
   return (
     <div className="flex items-center gap-3 p-3 rounded-md bg-muted/50 border border-border/50">
@@ -39,8 +52,8 @@ export function StatusIndicator({ error, hasKey, label, onRetry }: StatusIndicat
           `No ${label} Key found`
         )}
       </span>
-      {error && onRetry && (
-        <Button size="sm" variant="outline" className="ml-auto" onClick={() => onRetry()}>
+      {showRetry && (
+        <Button size="sm" variant="outline" className="ml-auto" onClick={() => onRetry?.()}>
           Retry
         </Button>
       )}
