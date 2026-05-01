@@ -14,6 +14,7 @@ use crate::commands::{
     play_pronunciation, save_api_key, save_sentence, stop_audio, update_sentence_translation,
 };
 use std::process::Command;
+use std::sync::atomic::AtomicUsize;
 use tauri::RunEvent;
 use tauri::async_runtime::block_on;
 use tauri::{Builder, Manager, generate_context, generate_handler};
@@ -47,6 +48,7 @@ pub fn run() {
             app.manage(db::DbState(pool));
             app.manage(CredentialsState {
                 available: credentials_available,
+                consecutive_timeouts: AtomicUsize::new(0),
             });
             capture::setup_event_tap(app.handle().clone());
             Ok(())
