@@ -49,6 +49,9 @@ export function useCredentials(provider: string = "openai") {
     setIsChecking(true);
     setIsStuck(false);
     setError(null);
+    // Reset hasKey so the UI accurately reflects "Checking…" instead of
+    // continuing to display the previously-known state during revalidation.
+    setHasKey(null);
 
     // Failsafe timer: Unlocks the 'Retry' button if the timeout promise itself fails to fire.
     if (stuckTimerRef.current !== null) {
@@ -87,7 +90,8 @@ export function useCredentials(provider: string = "openai") {
       }
       if (isMountedRef.current && requestIdRef.current === myRequestId) {
         setIsChecking(false);
-        setIsStuck(false);
+        // Intentionally do NOT clear isStuck here: if a stall was detected,
+        // keep the signal visible until the next check starts
       }
     }
   }, [provider]);
