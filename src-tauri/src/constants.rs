@@ -12,6 +12,8 @@ pub const OSASCRIPT_TIMEOUT: Duration = Duration::from_millis(1500);
 // --- Database Configuration ----------------------------------------------------------------------
 pub const DB_NAME: &str = "sentence_binder.db";
 pub const MAX_DB_CONNECTIONS: u32 = 5;
+/// The version of the JSON payload for the Import/Export function (which changes with DB schema changes).
+pub const LATEST_SCHEMA_VERSION: u32 = 1;
 
 // --- IPC events ----------------------------------------------------------------------------------
 /// Must match `CAPTURE_TRIGGERED` in `src/types/ipc.ts`.
