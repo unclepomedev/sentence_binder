@@ -1,9 +1,9 @@
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useDeleteSentence } from "@/hooks/useDeleteSentence";
-import { usePronunciation } from "@/hooks/usePronunciation";
-import { useSentences } from "@/hooks/useSentences";
-import { useUpdateTranslation } from "@/hooks/useUpdateTranslation";
-import { SentenceCard } from "./SentenceCard";
+import { SentenceCard } from "./components/SentenceCard";
+import { useDeleteSentence } from "./hooks/useDeleteSentence";
+import { usePronunciation } from "./hooks/usePronunciation";
+import { useSentences } from "./hooks/useSentences";
+import { useUpdateTranslation } from "./hooks/useUpdateTranslation";
 
 export function LibraryView() {
   const { sentences, isLoading, error } = useSentences();

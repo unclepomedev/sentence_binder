@@ -1,7 +1,8 @@
 mod sentences;
 
 pub use sentences::{
-    Sentence, delete_sentence, fetch_all_sentences, insert_sentence, update_translation,
+    delete_sentence, fetch_all_sentences, insert_sentence, insert_sentences_bulk,
+    update_translation,
 };
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions};
 use std::error::Error;

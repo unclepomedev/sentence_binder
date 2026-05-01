@@ -10,8 +10,9 @@ mod infrastructure;
 use apple_native_keyring_store::keychain::Store as AppleKeychainStore;
 
 use crate::commands::{
-    CredentialsState, delete_api_key, delete_sentence, extract_usage, get_sentences, has_api_key,
-    play_pronunciation, save_api_key, save_sentence, stop_audio, update_sentence_translation,
+    CredentialsState, delete_api_key, delete_sentence, export_sentences_json, extract_usage,
+    get_sentences, has_api_key, import_sentences_json, play_pronunciation, save_api_key,
+    save_sentence, stop_audio, update_sentence_translation,
 };
 use std::process::Command;
 use std::sync::atomic::AtomicUsize;
@@ -64,6 +65,8 @@ pub fn run() {
             stop_audio,
             update_sentence_translation,
             delete_sentence,
+            import_sentences_json,
+            export_sentences_json,
         ])
         .build(generate_context!())
         .expect("error while building tauri application")

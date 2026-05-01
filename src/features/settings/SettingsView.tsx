@@ -1,3 +1,4 @@
+import { DataManagementPanel } from "./components/DataManagement";
 import { WebLLMSettings } from "./components/WebLLMSettings";
 
 export function SettingsView() {
@@ -10,6 +11,7 @@ export function SettingsView() {
       <main className="flex-1 flex flex-col min-h-0 overflow-y-auto pb-6">
         <div className="flex flex-col gap-6">
           <WebLLMSettings />
+          <DataManagementPanel />
           {/* TODO: Future sections (e.g., <AudioSettings />, <AppearanceSettings />) will go here */}
         </div>
       </main>
