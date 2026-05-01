@@ -26,13 +26,8 @@ export function StatusIndicator({
         ? "bg-green-500"
         : "bg-destructive";
 
-  // Show Retry whenever the check has produced an error OR whenever we are
-  // still in the indeterminate `hasKey === null` state without an active
-  // in-flight check (e.g. an IPC hang that bypassed our timeout). This
-  // guarantees the user is never stuck on "Checking..." with no escape.
-  // Also offer Retry when a check has been running long enough to be
-  // considered stuck (e.g. JS-thread stall preventing timers from firing),
-  // so the user is never trapped on "Checking..." with no recourse.
+  // Guarantee the user is never trapped in a permanent "Checking..." state due to
+  // an IPC error, a bypassed timeout, or a stalled JS thread.
   const showRetry = !!onRetry && (!!error || (hasKey === null && !isChecking) || !!isStuck);
 
   return (
