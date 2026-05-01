@@ -24,6 +24,8 @@ export function SentenceCardHeader({
         disabled={isLocked && !isPlaying}
         className="text-muted-foreground hover:text-foreground shrink-0 transition-colors"
         onClick={onTogglePlay}
+        aria-label={isPlaying ? "Stop pronunciation" : "Play pronunciation"}
+        title={isPlaying ? "Stop pronunciation" : "Play pronunciation"}
       >
         {isPlaying ? <Square className="fill-current text-foreground" /> : <Volume2 />}
       </Button>
