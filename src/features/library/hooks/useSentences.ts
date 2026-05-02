@@ -5,11 +5,12 @@ import { IpcCommands } from "@/types/ipc";
 import { sentencesQueryKey } from "./sentencesQueryKey";
 
 export function useSentences(searchQuery: string = "") {
+  const normalized = searchQuery.trim();
   const query = useQuery({
-    queryKey: sentencesQueryKey(searchQuery),
+    queryKey: sentencesQueryKey(normalized),
     queryFn: async () => {
       return await invoke<Sentence[]>(IpcCommands.GET_SENTENCES, {
-        searchQuery: searchQuery.trim() || null,
+        searchQuery: normalized || null,
       });
     },
   });

@@ -9,10 +9,13 @@ import { usePronunciation } from "./hooks/usePronunciation";
 import { useSentences } from "./hooks/useSentences";
 import { useUpdateTranslation } from "./hooks/useUpdateTranslation";
 
+const SEARCH_DEBOUNCE_DELAY_MS = 300;
+
 export function LibraryView() {
   const [searchTerm, setSearchTerm] = useState("");
-  const debouncedSearchTerm = useDebounce(searchTerm, 300);
-  const { sentences, isLoading, error } = useSentences(debouncedSearchTerm);
+  const debouncedSearchTerm = useDebounce(searchTerm, SEARCH_DEBOUNCE_DELAY_MS);
+  const normalizedQuery = debouncedSearchTerm.trim();
+  const { sentences, isLoading, error } = useSentences(normalizedQuery);
   const { playingId, toggleAudio, stopAudio } = usePronunciation();
   const { updateTranslation } = useUpdateTranslation();
   const { deleteSentence } = useDeleteSentence();
@@ -33,11 +36,11 @@ export function LibraryView() {
             {sentences.length === 0 && !isLoading && !error && (
               <div className="flex flex-col items-center justify-center py-10 text-center">
                 <p className="text-sm text-muted-foreground">
-                  {debouncedSearchTerm
-                    ? `No results found for "${debouncedSearchTerm}"`
+                  {normalizedQuery
+                    ? `No results found for "${normalizedQuery}"`
                     : "No sentences saved yet."}
                 </p>
-                {debouncedSearchTerm && (
+                {normalizedQuery && (
                   <Button variant="link" onClick={() => setSearchTerm("")} className="mt-2 text-sm">
                     Clear search
                   </Button>
@@ -49,7 +52,7 @@ export function LibraryView() {
               <SentenceCard
                 key={item.id}
                 item={item}
-                searchQuery={debouncedSearchTerm}
+                searchQuery={normalizedQuery}
                 isPlaying={playingId === item.id}
                 isLocked={playingId !== null}
                 onTogglePlay={() => toggleAudio(item.id, item.original_text)}

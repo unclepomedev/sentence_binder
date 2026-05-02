@@ -2,13 +2,18 @@ import type * as React from "react";
 
 interface HighlightTextProps extends React.HTMLAttributes<HTMLSpanElement> {
   text?: string | null;
+  /**
+   * The search query to highlight. Callers must pass a pre-normalized (trimmed) value;
+   * pass an empty string (or omit) to disable highlighting.
+   */
   query?: string;
 }
 
 export function HighlightText({ text, query, className, ...props }: HighlightTextProps) {
   if (!text) return null;
 
-  if (!query?.trim()) {
+  const normalizedQuery = query ?? "";
+  if (!normalizedQuery) {
     return (
       <span className={className} {...props}>
         {text}
@@ -16,7 +21,7 @@ export function HighlightText({ text, query, className, ...props }: HighlightTex
     );
   }
 
-  const escapedQuery = query.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&");
+  const escapedQuery = normalizedQuery.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&");
   const parts = text.split(new RegExp(`(${escapedQuery})`, "gi"));
 
   return (
@@ -24,7 +29,7 @@ export function HighlightText({ text, query, className, ...props }: HighlightTex
       {parts.map((part, index) => {
         const uniqueKey = `${part}-${index}`;
 
-        return part.toLowerCase() === query.toLowerCase() ? (
+        return part.toLowerCase() === normalizedQuery.toLowerCase() ? (
           <mark
             key={uniqueKey}
             className="bg-yellow-400/40 text-foreground rounded-xs px-0.5 font-medium transition-colors"
