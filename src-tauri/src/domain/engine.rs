@@ -16,4 +16,12 @@ pub trait LlmEngine: Send + Sync {
     /// Extracts the specific meaning and usage of a highlighted expression,
     /// taking the surrounding context into account.
     async fn extract_usage(&self, expression: &str, context: &str) -> Result<String, LlmError>;
+
+    /// Proofreads a user's translation attempt against the original text.
+    async fn proofread_attempt(
+        &self,
+        original_text: &str,
+        translated_text: &str,
+        user_attempt: &str,
+    ) -> Result<String, LlmError>;
 }

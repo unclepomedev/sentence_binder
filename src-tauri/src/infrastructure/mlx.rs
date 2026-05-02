@@ -5,8 +5,8 @@ use std::time::Duration;
 
 // prompt templates=================================================================================
 const TRANSLATE_SYSTEM_PROMPT: &str = "You are a professional translator. Translate the following English text into natural, fluent Japanese. Provide ONLY the translation, without any explanations or conversational filler.";
-
 const USAGE_SYSTEM_PROMPT: &str = "You are an English teacher. Explain the meaning and usage of the highlighted expression based on the provided context. Provide a concise explanation in Japanese and one clear example sentence in English. Output ONLY the explanation and example.";
+const PROOFREAD_SYSTEM_PROMPT: &str = "You are a supportive language tutor. The user is practicing translating from Japanese to English. You will be provided with the Japanese context, the correct English answer, and the user's attempt. Briefly point out any grammatical errors, unnatural phrasing, or missing nuances. If the user's attempt is correct but phrased differently than the original, warmly tell them it is a valid translation. Keep your feedback concise, encouraging, and strictly under 3 sentences.";
 // -------------------------------------------------------------------------------------------------
 
 const MLX_CLIENT_TIMEOUT_SECS: u64 = 60;
@@ -112,4 +112,19 @@ impl LlmEngine for MlxEngine {
         self.send_chat_request(USAGE_SYSTEM_PROMPT, &user_prompt)
             .await
     }
+
+    async fn proofread_attempt(
+        &self,
+        original_text: &str,
+        translated_text: &str,
+        user_attempt: &str,
+    ) -> Result<String, LlmError> {
+        let user_prompt = format!(
+            "Japanese context: {}\nCorrect English: {}\nUser's attempt: {}",
+            translated_text, original_text, user_attempt
+        );
+        self.send_chat_request(PROOFREAD_SYSTEM_PROMPT, &user_prompt)
+            .await
+    }
 }
+// TODO: replace hardcoded English/Japanese with user-provided language settings

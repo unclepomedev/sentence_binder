@@ -9,6 +9,7 @@ import {
   sentencesQueryKey,
 } from "@/features/library/hooks/sentencesQueryKey";
 import { LibraryView } from "@/features/library/LibraryView";
+import { PracticeView } from "@/features/practice/components/PracticeView.tsx";
 import { SettingsView } from "@/features/settings/SettingsView";
 import { useCapture } from "@/hooks/useCapture";
 import type { Sentence } from "@/types";
@@ -61,7 +62,9 @@ function App() {
       <Sidebar currentView={currentView} onViewChange={setCurrentView} />
 
       <div className="flex-1 min-w-0 p-6 h-full">
-        {currentView === "library" ? <LibraryView /> : <SettingsView />}
+        {currentView === "library" && <LibraryView />}
+        {currentView === "practice" && <PracticeView />}
+        {currentView === "settings" && <SettingsView />}
       </div>
 
       <Toaster />

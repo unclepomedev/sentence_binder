@@ -1,7 +1,7 @@
-import { BookOpen, Settings } from "lucide-react";
+import { BookOpen, PenTool, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-export type ViewState = "library" | "settings";
+export type ViewState = "library" | "practice" | "settings";
 
 interface SidebarProps {
   currentView: ViewState;
@@ -22,7 +22,18 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
         <BookOpen className="h-5 w-5" />
         <span className="sr-only">Library</span>
       </Button>
-
+      <Button
+        variant={currentView === "practice" ? "secondary" : "ghost"}
+        size="icon"
+        className="h-10 w-10 rounded-xl"
+        onClick={() => onViewChange("practice")}
+        title="Practice"
+        aria-pressed={currentView === "practice"}
+      >
+        <PenTool className="h-5 w-5" />
+        <span className="sr-only">Practice</span>
+      </Button>
+      <div className="flex-1" />
       <Button
         variant={currentView === "settings" ? "secondary" : "ghost"}
         size="icon"

@@ -23,6 +23,7 @@ export const IpcCommands = {
   DELETE_SENTENCE: "delete_sentence",
   EXPORT_SENTENCES_JSON: "export_sentences_json",
   IMPORT_SENTENCES_JSON: "import_sentences_json",
+  PROOFREAD_SENTENCE: "proofread_sentence",
 } as const;
 
 export type IpcCommand = (typeof IpcCommands)[keyof typeof IpcCommands];

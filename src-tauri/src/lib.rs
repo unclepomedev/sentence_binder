@@ -11,8 +11,8 @@ use apple_native_keyring_store::keychain::Store as AppleKeychainStore;
 
 use crate::commands::{
     CredentialsState, delete_api_key, delete_sentence, export_sentences_json, extract_usage,
-    get_sentences, has_api_key, import_sentences_json, play_pronunciation, save_api_key,
-    save_sentence, stop_audio, update_sentence_translation,
+    get_sentences, has_api_key, import_sentences_json, play_pronunciation, proofread_sentence,
+    save_api_key, save_sentence, stop_audio, update_sentence_translation,
 };
 use std::process::Command;
 use std::sync::atomic::AtomicUsize;
@@ -61,6 +61,7 @@ pub fn run() {
             has_api_key,
             delete_api_key,
             extract_usage,
+            proofread_sentence,
             play_pronunciation,
             stop_audio,
             update_sentence_translation,
