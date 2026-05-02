@@ -66,6 +66,9 @@ export function SentenceEditForm({
           placeholder="Tags (comma-separated, e.g. travel, N5, grammar)"
           disabled={isSaving}
           autoCapitalize="none"
+          autoComplete="off"
+          autoCorrect="off"
+          spellCheck={false}
         />
       </div>
       <div className="flex justify-end gap-2">
