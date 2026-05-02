@@ -39,7 +39,7 @@ pub async fn proofread_sentence(
         .await
         .map_err(|e| {
             eprintln!("[commands] Proofread failed: {}", e);
-            AppError::Internal("Failed to proofread".to_string())
+            e
         })?;
 
     Ok(feedback)

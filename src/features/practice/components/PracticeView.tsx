@@ -11,7 +11,7 @@ export function PracticeView() {
 
   const [currentSentence, setCurrentSentence] = useState<Sentence | null>(null);
   const [attempt, setAttempt] = useState("");
-  const [showOriginal, setShowOriginal] = useState(false); // Changed terminology
+  const [showOriginal, setShowOriginal] = useState(false);
 
   // Practice requires a non-empty translation as the target. Filter out sentences
   // whose translation is missing/blank (e.g., translation failed or user cleared it).
