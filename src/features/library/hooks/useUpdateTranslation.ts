@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { toast } from "sonner";
 import type { Sentence } from "@/types";
 import { IpcCommands } from "@/types/ipc";
+import { SENTENCES_QUERY_KEY_ROOT } from "./sentencesQueryKey";
 
 export function useUpdateTranslation() {
   const queryClient = useQueryClient();
@@ -18,7 +19,7 @@ export function useUpdateTranslation() {
         newContext: normalizedContext,
       });
 
-      queryClient.setQueryData(["sentences"], (old: Sentence[] | undefined) =>
+      queryClient.setQueriesData<Sentence[]>({ queryKey: [SENTENCES_QUERY_KEY_ROOT] }, (old) =>
         old?.map((s) =>
           s.id === id
             ? {

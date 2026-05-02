@@ -4,6 +4,10 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Sidebar, type ViewState } from "@/components/layout/Sidebar";
 import { Toaster } from "@/components/ui/sonner";
+import {
+  SENTENCES_QUERY_KEY_ROOT,
+  sentencesQueryKey,
+} from "@/features/library/hooks/sentencesQueryKey";
 import { LibraryView } from "@/features/library/LibraryView";
 import { SettingsView } from "@/features/settings/SettingsView";
 import { useCapture } from "@/hooks/useCapture";
@@ -31,9 +35,18 @@ function App() {
     toast.promise(savePromise, {
       loading: `Translating: "${previewText}"`,
       success: (newSentence) => {
-        queryClient.setQueryData(["sentences"], (old: Sentence[] | undefined) => {
+        // Instantly update the base (unfiltered) cache so the new sentence appears at the top.
+        // For active searches, invalidate the cache to force a background refetch. Replicating
+        // SQLite's FTS5 matching logic client-side is impractical, so let the backend handle it.
+        queryClient.setQueryData<Sentence[]>(sentencesQueryKey(), (old) => {
           return old ? [newSentence, ...old] : [newSentence];
         });
+        queryClient
+          .invalidateQueries({
+            queryKey: [SENTENCES_QUERY_KEY_ROOT],
+            predicate: (q) => q.queryKey[1] !== "",
+          })
+          .then();
 
         return newSentence.translated_text.trim().length > 0
           ? "Saved and translated successfully!"

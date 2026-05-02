@@ -3,6 +3,7 @@ import { Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { HighlightText } from "@/components/ui/highlight-text";
 
 interface SentenceCardViewerProps {
   id: string;
@@ -10,6 +11,7 @@ interface SentenceCardViewerProps {
   sourceContext: string | null;
   isPlaying: boolean;
   isLocked: boolean;
+  searchQuery?: string;
   onEdit: () => void;
   onDelete: (id: string) => Promise<void>;
   onStopAudio: () => Promise<void>;
@@ -21,6 +23,7 @@ export function SentenceCardViewer({
   sourceContext,
   isPlaying,
   isLocked,
+  searchQuery = "",
   onEdit,
   onDelete,
   onStopAudio,
@@ -77,7 +80,11 @@ export function SentenceCardViewer({
       <p
         className={`text-sm ${!translatedText ? "text-destructive italic" : "text-muted-foreground"}`}
       >
-        {translatedText || "[ Translation Failed ]"}
+        {translatedText ? (
+          <HighlightText text={translatedText} query={searchQuery} />
+        ) : (
+          "[ Translation Failed ]"
+        )}
       </p>
 
       <div className="flex items-end justify-between mt-3">
@@ -108,7 +115,7 @@ export function SentenceCardViewer({
 
         {sourceContext && (
           <p className="text-[10px] text-muted-foreground/60 text-right truncate max-w-[70%] ml-auto">
-            {sourceContext}
+            <HighlightText text={sourceContext} query={searchQuery} />
           </p>
         )}
       </div>
