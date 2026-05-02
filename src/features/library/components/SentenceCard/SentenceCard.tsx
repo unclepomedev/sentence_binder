@@ -11,9 +11,15 @@ interface SentenceCardProps {
   isLocked: boolean;
   searchQuery?: string;
   onTogglePlay: () => void;
-  onSaveEdit: (id: string, newText: string, newContext: string | null) => Promise<void>;
+  onSaveEdit: (
+    id: string,
+    newText: string,
+    newContext: string | null,
+    tags: string[],
+  ) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   onStopAudio: () => Promise<void>;
+  onTagClick: (tag: string) => void;
 }
 
 export function SentenceCard({
@@ -25,6 +31,7 @@ export function SentenceCard({
   onSaveEdit,
   onDelete,
   onStopAudio,
+  onTagClick,
 }: SentenceCardProps) {
   const [isEditing, setIsEditing] = useState(false);
 
@@ -43,8 +50,9 @@ export function SentenceCard({
           <SentenceEditForm
             initialText={item.translated_text}
             initialContext={item.source_context}
-            onSave={(newText, newContext) =>
-              onSaveEdit(item.id, newText, newContext).then(() => setIsEditing(false))
+            initialTags={item.tags}
+            onSave={(newText, newContext, newTags) =>
+              onSaveEdit(item.id, newText, newContext, newTags).then(() => setIsEditing(false))
             }
             onCancel={() => setIsEditing(false)}
           />
@@ -53,12 +61,14 @@ export function SentenceCard({
             id={item.id}
             translatedText={item.translated_text}
             sourceContext={item.source_context}
+            tags={item.tags}
             isPlaying={isPlaying}
             isLocked={isLocked}
             searchQuery={searchQuery}
             onEdit={() => setIsEditing(true)}
             onDelete={onDelete}
             onStopAudio={onStopAudio}
+            onTagClick={onTagClick}
           />
         )}
       </CardContent>

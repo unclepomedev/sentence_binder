@@ -73,6 +73,7 @@ pub async fn update_sentence_translation(
     id: String,
     new_translation: String,
     new_context: Option<String>,
+    tags: Vec<String>,
 ) -> Result<(), AppError> {
     let new_translation = new_translation.trim().to_string();
 
@@ -81,7 +82,13 @@ pub async fn update_sentence_translation(
         .map(|s| s.trim())
         .filter(|s| !s.is_empty());
 
-    db::update_translation(&state.0, &id, &new_translation, new_context)
+    let clean_tags: Vec<String> = tags
+        .into_iter()
+        .map(|t| t.trim().to_string())
+        .filter(|t| !t.is_empty())
+        .collect();
+
+    db::update_translation(&state.0, &id, &new_translation, new_context, &clean_tags)
         .await
         .map_err(|e| match e {
             sqlx::Error::RowNotFound => {

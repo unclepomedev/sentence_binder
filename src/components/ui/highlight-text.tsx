@@ -21,9 +21,9 @@ export function HighlightText({ text, query, className, ...props }: HighlightTex
     );
   }
 
-  // The search query to highlight. Callers must pass a pre-normalized (trimmed) value;
-  // pass an empty string (or omit) to disable highlighting.
-  const terms = normalizedQuery.split(/\s+/).filter(Boolean);
+  const cleanQuery = normalizedQuery.replace(/tag:/gi, "");
+  const terms = cleanQuery.split(/\s+/).filter(Boolean);
+
   if (terms.length === 0) {
     return (
       <span className={className} {...props}>

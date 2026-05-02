@@ -119,20 +119,24 @@ pub async fn fetch_all_sentences(pool: &SqlitePool) -> Result<Vec<Sentence>, sql
     Ok(sentences)
 }
 
-/// Updates the translated text and context of an existing sentence.
+/// Updates the translated text, context, and tags of an existing sentence.
 pub async fn update_translation(
     pool: &SqlitePool,
     id: &str,
     new_translation: &str,
     new_context: Option<&str>,
+    tags: &[String],
 ) -> Result<(), sqlx::Error> {
-    let result =
-        sqlx::query("UPDATE sentences SET translated_text = ?, source_context = ? WHERE id = ?")
-            .bind(new_translation)
-            .bind(new_context)
-            .bind(id)
-            .execute(pool)
-            .await?;
+    let tags_joined = tags.join(",");
+    let result = sqlx::query(
+        "UPDATE sentences SET translated_text = ?, source_context = ?, tags = ? WHERE id = ?",
+    )
+    .bind(new_translation)
+    .bind(new_context)
+    .bind(tags_joined)
+    .bind(id)
+    .execute(pool)
+    .await?;
 
     if result.rows_affected() == 0 {
         return Err(sqlx::Error::RowNotFound);
@@ -164,9 +168,16 @@ pub async fn search_sentences(
     if query.is_empty() {
         return fetch_all_sentences(pool).await;
     }
+
     let fts_query = query
         .split_whitespace()
-        .map(|term| format!("\"{}\"*", term.replace('"', "")))
+        .map(|term| {
+            if let Some(tag_value) = term.strip_prefix("tag:") {
+                format!("tags:\"{}\"*", tag_value.replace('"', ""))
+            } else {
+                format!("\"{}\"*", term.replace('"', ""))
+            }
+        })
         .collect::<Vec<_>>()
         .join(" AND ");
 
@@ -311,7 +322,7 @@ mod tests {
         let new_context = Some("Updated Context");
 
         let update_result =
-            update_translation(&pool, &sentence.id, new_translation, new_context).await;
+            update_translation(&pool, &sentence.id, new_translation, new_context, &[]).await;
         assert!(update_result.is_ok());
 
         let row: (String, String, Option<String>) = sqlx::query_as(
@@ -332,11 +343,35 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_update_translation_with_tags() {
+        let pool = setup_in_memory_db().await;
+
+        let sentence = insert_sentence(&pool, "Base text", "基本テキスト", None, &[])
+            .await
+            .expect("Failed to insert initial sentence");
+
+        let new_tags = vec!["tag1".to_string(), "tag2".to_string()];
+
+        let update_result =
+            update_translation(&pool, &sentence.id, "基本テキスト", None, &new_tags).await;
+        assert!(update_result.is_ok());
+
+        let row: (String, String) =
+            sqlx::query_as("SELECT original_text, tags FROM sentences WHERE id = ?")
+                .bind(&sentence.id)
+                .fetch_one(&pool)
+                .await
+                .expect("Failed to fetch updated row");
+
+        assert_eq!(row.1, "tag1,tag2", "Tags should be successfully updated");
+    }
+
+    #[tokio::test]
     async fn test_update_translation_unknown_id_returns_error() {
         let pool = setup_in_memory_db().await;
 
         let unknown_id = Uuid::new_v4().to_string();
-        let result = update_translation(&pool, &unknown_id, "any", None).await;
+        let result = update_translation(&pool, &unknown_id, "any", None, &[]).await;
 
         assert!(
             matches!(result, Err(sqlx::Error::RowNotFound)),
@@ -639,6 +674,7 @@ mod tests {
             &sentence.id,
             "Updated translation",
             Some("New Context"),
+            &[],
         )
         .await
         .unwrap();

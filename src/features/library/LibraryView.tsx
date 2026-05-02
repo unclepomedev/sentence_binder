@@ -59,6 +59,7 @@ export function LibraryView() {
                 onSaveEdit={updateTranslation}
                 onDelete={deleteSentence}
                 onStopAudio={stopAudio}
+                onTagClick={(tag) => setSearchTerm(`tag:${tag}`)}
               />
             ))}
           </div>
