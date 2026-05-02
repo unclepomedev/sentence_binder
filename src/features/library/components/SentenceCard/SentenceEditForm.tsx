@@ -7,24 +7,32 @@ import { Textarea } from "@/components/ui/textarea";
 interface SentenceEditFormProps {
   initialText: string;
   initialContext: string | null;
-  onSave: (newText: string, newContext: string | null) => Promise<void>;
+  initialTags: string[];
+  onSave: (newText: string, newContext: string | null, newTags: string[]) => Promise<void>;
   onCancel: () => void;
 }
 
 export function SentenceEditForm({
   initialText,
   initialContext,
+  initialTags,
   onSave,
   onCancel,
 }: SentenceEditFormProps) {
   const [draftText, setDraftText] = useState(initialText);
   const [draftContext, setDraftContext] = useState(initialContext || "");
+  const [draftTags, setDraftTags] = useState(initialTags.join(", "));
   const [isSaving, setIsSaving] = useState(false);
 
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await onSave(draftText.trim(), draftContext.trim() || null);
+      const tagsArray = draftTags
+        .split(",")
+        .map((t) => t.trim())
+        .filter((t, index, all) => t.length > 0 && all.indexOf(t) === index);
+
+      await onSave(draftText.trim(), draftContext.trim() || null, tagsArray);
     } catch {
       // Error is handled/toasted upstream; just allow the user to retry.
     } finally {
@@ -49,6 +57,18 @@ export function SentenceEditForm({
           onChange={(e) => setDraftContext(e.target.value)}
           placeholder="Source context (e.g. App Name - URL)"
           disabled={isSaving}
+        />
+        <Input
+          type="text"
+          className="text-[11px] text-muted-foreground bg-muted/30 focus-visible:bg-background placeholder:text-muted-foreground/50"
+          value={draftTags}
+          onChange={(e) => setDraftTags(e.target.value)}
+          placeholder="Tags (comma-separated, e.g. travel, N5, grammar)"
+          disabled={isSaving}
+          autoCapitalize="none"
+          autoComplete="off"
+          autoCorrect="off"
+          spellCheck={false}
         />
       </div>
       <div className="flex justify-end gap-2">

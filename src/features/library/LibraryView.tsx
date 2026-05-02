@@ -27,12 +27,12 @@ export function LibraryView() {
         <LibrarySearch value={searchTerm} onChange={setSearchTerm} />
       </header>
 
-      <main className="flex-1 flex flex-col min-h-0 overflow-hidden">
-        {isLoading && <p className="text-sm text-muted-foreground flex-none">Loading...</p>}
-        {error && <p className="text-sm text-destructive flex-none">Failed to load data.</p>}
+      <main className="flex-1 min-h-0 overflow-hidden">
+        <ScrollArea className="h-full rounded-md border bg-card/50">
+          <div className="flex flex-col gap-4 p-4">
+            {isLoading && <p className="text-sm text-muted-foreground text-center">Loading...</p>}
+            {error && <p className="text-sm text-destructive text-center">Failed to load data.</p>}
 
-        <ScrollArea className="flex-1 rounded-md border p-4">
-          <div className="flex flex-col gap-4">
             {sentences.length === 0 && !isLoading && !error && (
               <div className="flex flex-col items-center justify-center py-10 text-center">
                 <p className="text-sm text-muted-foreground">
@@ -59,6 +59,7 @@ export function LibraryView() {
                 onSaveEdit={updateTranslation}
                 onDelete={deleteSentence}
                 onStopAudio={stopAudio}
+                onTagClick={(tag) => setSearchTerm(`tag:${tag}`)}
               />
             ))}
           </div>

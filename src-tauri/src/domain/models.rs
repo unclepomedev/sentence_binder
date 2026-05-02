@@ -6,6 +6,7 @@ pub struct Sentence {
     pub original_text: String,
     pub translated_text: String,
     pub source_context: Option<String>,
+    pub tags: Vec<String>,
     pub created_at: i64,
 }
 

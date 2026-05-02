@@ -13,17 +13,24 @@ struct SentenceRow {
     pub original_text: String,
     pub translated_text: String,
     pub source_context: Option<String>,
+    pub tags: String,
     /// milliseconds
     pub created_at: i64,
 }
 
 impl From<SentenceRow> for Sentence {
     fn from(row: SentenceRow) -> Self {
+        let tags = if row.tags.trim().is_empty() {
+            vec![]
+        } else {
+            row.tags.split(',').map(|s| s.trim().to_string()).collect()
+        };
         Self {
             id: row.id,
             original_text: row.original_text,
             translated_text: row.translated_text,
             source_context: row.source_context,
+            tags,
             created_at: row.created_at,
         }
     }
@@ -35,18 +42,21 @@ pub async fn insert_sentence(
     original_text: &str,
     translated_text: &str,
     source_context: Option<&str>,
+    tags: &[String],
 ) -> Result<Sentence, sqlx::Error> {
     let id = Uuid::new_v4().to_string();
     let now = Utc::now().timestamp_millis();
+    let tags_joined = tags.join(",");
 
     sqlx::query(
-        "INSERT INTO sentences (id, original_text, translated_text, source_context, created_at)
-         VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO sentences (id, original_text, translated_text, source_context, tags, created_at)
+         VALUES (?, ?, ?, ?, ?, ?)",
     )
     .bind(&id)
     .bind(original_text)
     .bind(translated_text)
     .bind(source_context)
+    .bind(&tags_joined)
     .bind(now)
     .execute(pool)
     .await?;
@@ -56,6 +66,7 @@ pub async fn insert_sentence(
         original_text: original_text.to_string(),
         translated_text: translated_text.to_string(),
         source_context: source_context.map(|s| s.to_string()),
+        tags: tags.to_vec(),
         created_at: now,
     })
 }
@@ -75,13 +86,14 @@ pub async fn insert_sentences_bulk(
 
     for chunk in sentences.chunks(BULK_INSERT_CHUNK_SIZE) {
         let mut query_builder: QueryBuilder<Sqlite> = QueryBuilder::new(
-            "INSERT INTO sentences (id, original_text, translated_text, source_context, created_at) ",
+            "INSERT INTO sentences (id, original_text, translated_text, source_context, tags, created_at) ",
         );
         query_builder.push_values(chunk, |mut b, sentence| {
             b.push_bind(&sentence.id)
                 .push_bind(&sentence.original_text)
                 .push_bind(&sentence.translated_text)
                 .push_bind(&sentence.source_context)
+                .push_bind(sentence.tags.join(","))
                 .push_bind(sentence.created_at);
         });
         query_builder.push(" ON CONFLICT(id) DO NOTHING");
@@ -96,7 +108,7 @@ pub async fn insert_sentences_bulk(
 
 pub async fn fetch_all_sentences(pool: &SqlitePool) -> Result<Vec<Sentence>, sqlx::Error> {
     let rows = sqlx::query_as::<_, SentenceRow>(
-        "SELECT id, original_text, translated_text, source_context, created_at
+        "SELECT id, original_text, translated_text, source_context, tags, created_at
          FROM sentences
          ORDER BY created_at DESC, id DESC",
     )
@@ -107,20 +119,24 @@ pub async fn fetch_all_sentences(pool: &SqlitePool) -> Result<Vec<Sentence>, sql
     Ok(sentences)
 }
 
-/// Updates the translated text and context of an existing sentence.
+/// Updates the translated text, context, and tags of an existing sentence.
 pub async fn update_translation(
     pool: &SqlitePool,
     id: &str,
     new_translation: &str,
     new_context: Option<&str>,
+    tags: &[String],
 ) -> Result<(), sqlx::Error> {
-    let result =
-        sqlx::query("UPDATE sentences SET translated_text = ?, source_context = ? WHERE id = ?")
-            .bind(new_translation)
-            .bind(new_context)
-            .bind(id)
-            .execute(pool)
-            .await?;
+    let tags_joined = tags.join(",");
+    let result = sqlx::query(
+        "UPDATE sentences SET translated_text = ?, source_context = ?, tags = ? WHERE id = ?",
+    )
+    .bind(new_translation)
+    .bind(new_context)
+    .bind(tags_joined)
+    .bind(id)
+    .execute(pool)
+    .await?;
 
     if result.rows_affected() == 0 {
         return Err(sqlx::Error::RowNotFound);
@@ -152,14 +168,17 @@ pub async fn search_sentences(
     if query.is_empty() {
         return fetch_all_sentences(pool).await;
     }
-    let fts_query = query
-        .split_whitespace()
-        .map(|term| format!("{}*", term.replace('"', "")))
-        .collect::<Vec<_>>()
-        .join(" AND ");
+
+    let fts_query = build_fts_query(query);
+
+    // If the query only contained invalid empty tags (e.g., "tag:  "), fetch all
+    if fts_query.is_empty() {
+        return fetch_all_sentences(pool).await;
+    }
+
     let rows = sqlx::query_as::<_, SentenceRow>(
         r#"
-        SELECT s.id, s.original_text, s.translated_text, s.source_context, s.created_at
+        SELECT s.id, s.original_text, s.translated_text, s.source_context, s.tags, s.created_at
         FROM sentences s
         JOIN sentences_fts f ON s.id = f.id
         WHERE sentences_fts MATCH ?
@@ -173,6 +192,55 @@ pub async fn search_sentences(
     Ok(rows.into_iter().map(Sentence::from).collect())
 }
 
+/// Parses a raw search string into an FTS5 MATCH query.
+/// Supports exact matches via quotes and tag filtering (e.g., `tag:"business trip"`).
+fn build_fts_query(query: &str) -> String {
+    let mut terms = Vec::new();
+    let mut current_term = String::new();
+    let mut in_quotes = false;
+
+    for c in query.chars() {
+        match c {
+            '"' => in_quotes = !in_quotes,
+            ' ' | '\t' | '\n' if !in_quotes => {
+                if !current_term.is_empty() {
+                    terms.push(current_term.clone());
+                    current_term.clear();
+                }
+            }
+            _ => current_term.push(c),
+        }
+    }
+    if !current_term.is_empty() {
+        terms.push(current_term);
+    }
+
+    terms
+        .into_iter()
+        .filter_map(|term| {
+            if let Some(tag_value) = term.strip_prefix("tag:") {
+                let clean_val = tag_value.trim();
+                if clean_val.is_empty() {
+                    None
+                } else {
+                    Some(format!("tags:\"{}\"*", clean_val))
+                }
+            } else {
+                let clean_val = term.trim();
+                if clean_val.is_empty() {
+                    None
+                } else {
+                    Some(format!("\"{}\"*", clean_val))
+                }
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" AND ")
+}
+
+// ===============================================================================================
+// Unit tests
+// ===============================================================================================
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -185,17 +253,20 @@ mod tests {
         original_text: &str,
         translated_text: &str,
         source_context: Option<&str>,
+        tags: &[String],
         created_at: i64,
     ) -> Result<String, sqlx::Error> {
         let id = Uuid::new_v4().to_string();
+        let tags_joined = tags.join(",");
         sqlx::query(
-            "INSERT INTO sentences (id, original_text, translated_text, source_context, created_at)
-             VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO sentences (id, original_text, translated_text, source_context, tags, created_at)
+             VALUES (?, ?, ?, ?, ?, ?)",
         )
         .bind(&id)
         .bind(original_text)
         .bind(translated_text)
         .bind(source_context)
+        .bind(tags_joined)
         .bind(created_at)
         .execute(pool)
         .await?;
@@ -229,34 +300,38 @@ mod tests {
         let original = "This is a test.";
         let translated = "これはテストです。";
         let context = Some("Google Chrome");
+        let tags = vec!["test".to_string(), "sample".to_string()];
 
-        let sentence_result = insert_sentence(&pool, original, translated, context).await;
+        let sentence_result = insert_sentence(&pool, original, translated, context, &tags).await;
 
         assert!(sentence_result.is_ok());
 
         let sentence = sentence_result.unwrap();
         assert_eq!(sentence.id.len(), 36); // UUID string length
+        assert_eq!(sentence.tags.len(), 2);
 
         // Verify the data was actually written to the DB
-        let row: (String, String) =
-            sqlx::query_as("SELECT original_text, translated_text FROM sentences WHERE id = ?")
-                .bind(&sentence.id)
-                .fetch_one(&pool)
-                .await
-                .expect("Failed to fetch inserted row");
+        let row: (String, String, String) = sqlx::query_as(
+            "SELECT original_text, translated_text, tags FROM sentences WHERE id = ?",
+        )
+        .bind(&sentence.id)
+        .fetch_one(&pool)
+        .await
+        .expect("Failed to fetch inserted row");
 
         assert_eq!(row.0, original);
         assert_eq!(row.1, translated);
+        assert_eq!(row.2, "test,sample");
     }
 
     #[tokio::test]
     async fn test_fetch_all_sentences() {
         let pool = setup_in_memory_db().await;
 
-        insert_sentence_at(&pool, "First", "一つ目", None, 1_000)
+        insert_sentence_at(&pool, "First", "一つ目", None, &[], 1_000)
             .await
             .unwrap();
-        insert_sentence_at(&pool, "Second", "二つ目", Some("Context"), 2_000)
+        insert_sentence_at(&pool, "Second", "二つ目", Some("Context"), &[], 2_000)
             .await
             .unwrap();
 
@@ -280,7 +355,7 @@ mod tests {
         let original = "I need an update.";
         let initial_translated = "古い翻訳";
 
-        let sentence = insert_sentence(&pool, original, initial_translated, None)
+        let sentence = insert_sentence(&pool, original, initial_translated, None, &[])
             .await
             .expect("Failed to insert initial sentence");
 
@@ -288,7 +363,7 @@ mod tests {
         let new_context = Some("Updated Context");
 
         let update_result =
-            update_translation(&pool, &sentence.id, new_translation, new_context).await;
+            update_translation(&pool, &sentence.id, new_translation, new_context, &[]).await;
         assert!(update_result.is_ok());
 
         let row: (String, String, Option<String>) = sqlx::query_as(
@@ -309,11 +384,35 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_update_translation_with_tags() {
+        let pool = setup_in_memory_db().await;
+
+        let sentence = insert_sentence(&pool, "Base text", "基本テキスト", None, &[])
+            .await
+            .expect("Failed to insert initial sentence");
+
+        let new_tags = vec!["tag1".to_string(), "tag2".to_string()];
+
+        let update_result =
+            update_translation(&pool, &sentence.id, "基本テキスト", None, &new_tags).await;
+        assert!(update_result.is_ok());
+
+        let row: (String, String) =
+            sqlx::query_as("SELECT original_text, tags FROM sentences WHERE id = ?")
+                .bind(&sentence.id)
+                .fetch_one(&pool)
+                .await
+                .expect("Failed to fetch updated row");
+
+        assert_eq!(row.1, "tag1,tag2", "Tags should be successfully updated");
+    }
+
+    #[tokio::test]
     async fn test_update_translation_unknown_id_returns_error() {
         let pool = setup_in_memory_db().await;
 
         let unknown_id = Uuid::new_v4().to_string();
-        let result = update_translation(&pool, &unknown_id, "any", None).await;
+        let result = update_translation(&pool, &unknown_id, "any", None, &[]).await;
 
         assert!(
             matches!(result, Err(sqlx::Error::RowNotFound)),
@@ -326,7 +425,7 @@ mod tests {
     async fn test_delete_sentence() {
         let pool = setup_in_memory_db().await;
 
-        let sentence = insert_sentence(&pool, "Delete me", "私を削除して", None)
+        let sentence = insert_sentence(&pool, "Delete me", "私を削除して", None, &[])
             .await
             .expect("Failed to insert sentence");
 
@@ -374,6 +473,7 @@ mod tests {
                 original_text: format!("Original {}", i),
                 translated_text: format!("Translated {}", i),
                 source_context: Some(format!("Context {}", i)),
+                tags: vec![],
                 created_at: 1000 + i as i64,
             })
             .collect();
@@ -403,6 +503,7 @@ mod tests {
                 original_text: format!("Bulk Original {}", i),
                 translated_text: format!("Bulk Translated {}", i),
                 source_context: None,
+                tags: vec![],
                 created_at: Utc::now().timestamp_millis(),
             })
             .collect();
@@ -427,6 +528,7 @@ mod tests {
             original_text: "Existing 1".to_string(),
             translated_text: "Trans 1".to_string(),
             source_context: None,
+            tags: vec![],
             created_at: 1000,
         };
         let sentence2 = Sentence {
@@ -434,6 +536,7 @@ mod tests {
             original_text: "Existing 2".to_string(),
             translated_text: "Trans 2".to_string(),
             source_context: None,
+            tags: vec![],
             created_at: 2000,
         };
 
@@ -465,6 +568,7 @@ mod tests {
             original_text: "Old Sentence".to_string(),
             translated_text: "Old Trans".to_string(),
             source_context: None,
+            tags: vec![],
             created_at: 1000,
         };
         let sentence_new = Sentence {
@@ -472,6 +576,7 @@ mod tests {
             original_text: "New Sentence".to_string(),
             translated_text: "New Trans".to_string(),
             source_context: None,
+            tags: vec![],
             created_at: 2000,
         };
 
@@ -498,10 +603,10 @@ mod tests {
     async fn test_search_sentences_empty_query_returns_all() {
         let pool = setup_in_memory_db().await;
 
-        insert_sentence(&pool, "First", "一つ目", None)
+        insert_sentence(&pool, "First", "一つ目", None, &[])
             .await
             .unwrap();
-        insert_sentence(&pool, "Second", "二つ目", None)
+        insert_sentence(&pool, "Second", "二つ目", None, &[])
             .await
             .unwrap();
 
@@ -520,14 +625,21 @@ mod tests {
     async fn test_search_sentences_prefix_and_exact_match() {
         let pool = setup_in_memory_db().await;
 
-        insert_sentence(&pool, "The quick brown fox", "素早い茶色のキツネ", None)
-            .await
-            .unwrap();
+        insert_sentence(
+            &pool,
+            "The quick brown fox",
+            "素早い茶色のキツネ",
+            None,
+            &[],
+        )
+        .await
+        .unwrap();
         insert_sentence(
             &pool,
             "A completely different string",
             "全く違う文字列",
             None,
+            &[],
         )
         .await
         .unwrap();
@@ -556,6 +668,7 @@ mod tests {
             "Target in original",
             "Ignored",
             Some("Ignored context"),
+            &[],
         )
         .await
         .unwrap();
@@ -565,19 +678,24 @@ mod tests {
             "Ignored",
             "Target in translated",
             Some("Ignored context"),
+            &[],
         )
         .await
         .unwrap();
 
-        insert_sentence(&pool, "Ignored", "Ignored", Some("Target in context"))
+        insert_sentence(&pool, "Ignored", "Ignored", Some("Target in context"), &[])
+            .await
+            .unwrap();
+
+        insert_sentence(&pool, "Ignored", "Ignored", None, &["Target".to_string()])
             .await
             .unwrap();
 
         let results = search_sentences(&pool, "Target").await.unwrap();
         assert_eq!(
             results.len(),
-            3,
-            "Should match across original, translated, and context columns"
+            4,
+            "Should match across original, translated, context, AND tags columns"
         );
     }
 
@@ -585,7 +703,7 @@ mod tests {
     async fn test_search_sentences_triggers_update_and_delete() {
         let pool = setup_in_memory_db().await;
 
-        let sentence = insert_sentence(&pool, "Initial text", "初期テキスト", None)
+        let sentence = insert_sentence(&pool, "Initial text", "初期テキスト", None, &[])
             .await
             .unwrap();
 
@@ -597,6 +715,7 @@ mod tests {
             &sentence.id,
             "Updated translation",
             Some("New Context"),
+            &[],
         )
         .await
         .unwrap();
@@ -623,5 +742,83 @@ mod tests {
             0,
             "Delete trigger failed to clear index"
         );
+    }
+
+    #[tokio::test]
+    async fn test_search_sentences_with_special_characters() {
+        let pool = setup_in_memory_db().await;
+
+        insert_sentence(
+            &pool,
+            "Check out this link: https://example.com/page?q=1",
+            "リンクを見て：https://example.com/page?q=1",
+            Some("file.txt"),
+            &[],
+        )
+        .await
+        .unwrap();
+
+        insert_sentence(&pool, "Normal sentence here.", "普通", None, &[])
+            .await
+            .unwrap();
+
+        let results_url = search_sentences(&pool, "https://")
+            .await
+            .expect("Search with https:// failed");
+        assert_eq!(results_url.len(), 1);
+        assert!(results_url[0].original_text.contains("https://example.com"));
+
+        let results_domain = search_sentences(&pool, "example.com")
+            .await
+            .expect("Search with dot failed");
+        assert_eq!(results_domain.len(), 1);
+
+        let results_file = search_sentences(&pool, "file.txt")
+            .await
+            .expect("Search with extension failed");
+        assert_eq!(results_file.len(), 1);
+
+        let results_none = search_sentences(&pool, "https://google.com").await.unwrap();
+        assert_eq!(results_none.len(), 0);
+    }
+
+    #[test]
+    fn test_build_fts_query_standard_terms() {
+        assert_eq!(build_fts_query("apple"), "\"apple\"*");
+        assert_eq!(
+            build_fts_query("apple banana"),
+            "\"apple\"* AND \"banana\"*"
+        );
+    }
+
+    #[test]
+    fn test_build_fts_query_quoted_phrases() {
+        assert_eq!(build_fts_query("\"apple banana\""), "\"apple banana\"*");
+        assert_eq!(
+            build_fts_query("start \"middle phrase\" end"),
+            "\"start\"* AND \"middle phrase\"* AND \"end\"*"
+        );
+    }
+
+    #[test]
+    fn test_build_fts_query_tags() {
+        assert_eq!(build_fts_query("tag:business"), "tags:\"business\"*");
+        assert_eq!(
+            build_fts_query("tag:\"business trip\""),
+            "tags:\"business trip\"*"
+        );
+    }
+
+    #[test]
+    fn test_build_fts_query_mixed_and_empty() {
+        // Mixed tags and terms
+        assert_eq!(
+            build_fts_query("apple tag:fruit \"red delicious\""),
+            "\"apple\"* AND tags:\"fruit\"* AND \"red delicious\"*"
+        );
+
+        // Empty tags should be stripped out cleanly
+        assert_eq!(build_fts_query("tag:"), "");
+        assert_eq!(build_fts_query("apple tag:"), "\"apple\"*");
     }
 }

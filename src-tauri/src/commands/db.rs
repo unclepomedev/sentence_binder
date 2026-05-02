@@ -38,6 +38,7 @@ pub async fn save_sentence(
         &original_text,
         &translated_text,
         source_context.as_deref(),
+        &[],
     )
     .await
     .map_err(|e| {
@@ -72,6 +73,7 @@ pub async fn update_sentence_translation(
     id: String,
     new_translation: String,
     new_context: Option<String>,
+    tags: Vec<String>,
 ) -> Result<(), AppError> {
     let new_translation = new_translation.trim().to_string();
 
@@ -80,7 +82,21 @@ pub async fn update_sentence_translation(
         .map(|s| s.trim())
         .filter(|s| !s.is_empty());
 
-    db::update_translation(&state.0, &id, &new_translation, new_context)
+    let clean_tags: Vec<String> = tags
+        .into_iter()
+        .map(|t| t.trim().to_string())
+        .filter(|t| !t.is_empty())
+        .collect();
+
+    // Tags are stored as a comma-joined string and parsed via split(','),
+    // so reject any tag containing a comma to prevent corruption.
+    if clean_tags.iter().any(|t| t.contains(',')) {
+        return Err(AppError::Validation(
+            "Tags must not contain commas".to_string(),
+        ));
+    }
+
+    db::update_translation(&state.0, &id, &new_translation, new_context, &clean_tags)
         .await
         .map_err(|e| match e {
             sqlx::Error::RowNotFound => {

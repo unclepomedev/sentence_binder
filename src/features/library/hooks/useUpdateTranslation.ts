@@ -8,7 +8,12 @@ import { SENTENCES_QUERY_KEY_ROOT } from "./sentencesQueryKey";
 export function useUpdateTranslation() {
   const queryClient = useQueryClient();
 
-  const updateTranslation = async (id: string, newText: string, newContext: string | null) => {
+  const updateTranslation = async (
+    id: string,
+    newText: string,
+    newContext: string | null,
+    tags: string[],
+  ) => {
     const trimmedContext = newContext?.trim() ?? "";
     const normalizedContext = trimmedContext === "" ? null : trimmedContext;
 
@@ -17,6 +22,7 @@ export function useUpdateTranslation() {
         id,
         newTranslation: newText,
         newContext: normalizedContext,
+        tags,
       });
 
       queryClient.setQueriesData<Sentence[]>({ queryKey: [SENTENCES_QUERY_KEY_ROOT] }, (old) =>
@@ -26,6 +32,7 @@ export function useUpdateTranslation() {
                 ...s,
                 translated_text: newText,
                 source_context: normalizedContext,
+                tags,
               }
             : s,
         ),

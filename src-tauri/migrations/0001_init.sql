@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS sentences
     original_text TEXT NOT NULL,
     translated_text TEXT NOT NULL,
     source_context TEXT,
+    tags TEXT NOT NULL DEFAULT '', -- break 1NF for FTS5
     created_at INTEGER NOT NULL
 );
 
