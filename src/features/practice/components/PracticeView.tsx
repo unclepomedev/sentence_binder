@@ -32,12 +32,17 @@ export function PracticeView() {
 
   const handleProofread = async () => {
     if (!currentSentence || !attempt.trim()) return;
-    await proofread({
-      originalText: currentSentence.original_text,
-      translatedText: currentSentence.translated_text,
-      userAttempt: attempt,
-    });
-    setShowOriginal(true);
+    try {
+      await proofread({
+        originalText: currentSentence.original_text,
+        translatedText: currentSentence.translated_text,
+        userAttempt: attempt,
+      });
+      setShowOriginal(true);
+    } catch {
+      // Error is surfaced via the mutation's onError toast; swallow here to
+      // avoid unhandled promise rejections on IPC/LLM failures.
+    }
   };
 
   if (isLoading) {
