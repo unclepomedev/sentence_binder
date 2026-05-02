@@ -38,6 +38,7 @@ pub async fn save_sentence(
         &original_text,
         &translated_text,
         source_context.as_deref(),
+        &[],
     )
     .await
     .map_err(|e| {
