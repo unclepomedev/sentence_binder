@@ -9,6 +9,7 @@ interface SentenceCardProps {
   item: Sentence;
   isPlaying: boolean;
   isLocked: boolean;
+  searchQuery?: string;
   onTogglePlay: () => void;
   onSaveEdit: (id: string, newText: string, newContext: string | null) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
@@ -19,6 +20,7 @@ export function SentenceCard({
   item,
   isPlaying,
   isLocked,
+  searchQuery = "",
   onTogglePlay,
   onSaveEdit,
   onDelete,
@@ -32,6 +34,7 @@ export function SentenceCard({
         originalText={item.original_text}
         isPlaying={isPlaying}
         isLocked={isLocked}
+        searchQuery={searchQuery}
         onTogglePlay={onTogglePlay}
       />
 
@@ -52,6 +55,7 @@ export function SentenceCard({
             sourceContext={item.source_context}
             isPlaying={isPlaying}
             isLocked={isLocked}
+            searchQuery={searchQuery}
             onEdit={() => setIsEditing(true)}
             onDelete={onDelete}
             onStopAudio={onStopAudio}

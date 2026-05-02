@@ -49,6 +49,7 @@ export function LibraryView() {
               <SentenceCard
                 key={item.id}
                 item={item}
+                searchQuery={debouncedSearchTerm}
                 isPlaying={playingId === item.id}
                 isLocked={playingId !== null}
                 onTogglePlay={() => toggleAudio(item.id, item.original_text)}
