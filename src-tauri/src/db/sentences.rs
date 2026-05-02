@@ -152,7 +152,11 @@ pub async fn search_sentences(
     if query.is_empty() {
         return fetch_all_sentences(pool).await;
     }
-    let fts_query = format!("\"{}\"*", query.replace('"', ""));
+    let fts_query = query
+        .split_whitespace()
+        .map(|term| format!("{}*", term.replace('"', "")))
+        .collect::<Vec<_>>()
+        .join(" AND ");
     let rows = sqlx::query_as::<_, SentenceRow>(
         r#"
         SELECT s.id, s.original_text, s.translated_text, s.source_context, s.created_at
