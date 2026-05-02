@@ -142,6 +142,33 @@ pub async fn delete_sentence(pool: &SqlitePool, id: &str) -> Result<(), sqlx::Er
     Ok(())
 }
 
+/// Searches sentences (using SQLite FTS5).
+/// Results are ordered by relevance (rank), then by newest.
+pub async fn search_sentences(
+    pool: &SqlitePool,
+    search_query: &str,
+) -> Result<Vec<Sentence>, sqlx::Error> {
+    let query = search_query.trim();
+    if query.is_empty() {
+        return fetch_all_sentences(pool).await;
+    }
+    let fts_query = format!("\"{}\"*", query.replace('"', ""));
+    let rows = sqlx::query_as::<_, SentenceRow>(
+        r#"
+        SELECT s.id, s.original_text, s.translated_text, s.source_context, s.created_at
+        FROM sentences s
+        JOIN sentences_fts f ON s.id = f.id
+        WHERE sentences_fts MATCH ?
+        ORDER BY f.rank, s.created_at DESC
+        "#,
+    )
+    .bind(fts_query)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(rows.into_iter().map(Sentence::from).collect())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -461,5 +488,136 @@ mod tests {
 
         assert!(fetched.iter().any(|s| s.id == sentence_old.id));
         assert!(fetched.iter().any(|s| s.id == sentence_new.id));
+    }
+
+    #[tokio::test]
+    async fn test_search_sentences_empty_query_returns_all() {
+        let pool = setup_in_memory_db().await;
+
+        insert_sentence(&pool, "First", "一つ目", None)
+            .await
+            .unwrap();
+        insert_sentence(&pool, "Second", "二つ目", None)
+            .await
+            .unwrap();
+
+        let results = search_sentences(&pool, "").await.expect("Search failed");
+        let results_spaces = search_sentences(&pool, "   ").await.expect("Search failed");
+
+        assert_eq!(results.len(), 2, "Empty string should return all sentences");
+        assert_eq!(
+            results_spaces.len(),
+            2,
+            "Whitespace-only string should return all sentences"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_search_sentences_prefix_and_exact_match() {
+        let pool = setup_in_memory_db().await;
+
+        insert_sentence(&pool, "The quick brown fox", "素早い茶色のキツネ", None)
+            .await
+            .unwrap();
+        insert_sentence(
+            &pool,
+            "A completely different string",
+            "全く違う文字列",
+            None,
+        )
+        .await
+        .unwrap();
+
+        let exact = search_sentences(&pool, "brown").await.unwrap();
+        assert_eq!(exact.len(), 1);
+        assert_eq!(exact[0].original_text, "The quick brown fox");
+
+        let prefix = search_sentences(&pool, "bro").await.unwrap();
+        assert_eq!(prefix.len(), 1);
+        assert_eq!(prefix[0].original_text, "The quick brown fox");
+
+        let upper = search_sentences(&pool, "BROWN").await.unwrap();
+        assert_eq!(upper.len(), 1);
+
+        let none = search_sentences(&pool, "apple").await.unwrap();
+        assert_eq!(none.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_search_sentences_multi_column() {
+        let pool = setup_in_memory_db().await;
+
+        insert_sentence(
+            &pool,
+            "Target in original",
+            "Ignored",
+            Some("Ignored context"),
+        )
+        .await
+        .unwrap();
+
+        insert_sentence(
+            &pool,
+            "Ignored",
+            "Target in translated",
+            Some("Ignored context"),
+        )
+        .await
+        .unwrap();
+
+        insert_sentence(&pool, "Ignored", "Ignored", Some("Target in context"))
+            .await
+            .unwrap();
+
+        let results = search_sentences(&pool, "Target").await.unwrap();
+        assert_eq!(
+            results.len(),
+            3,
+            "Should match across original, translated, and context columns"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_search_sentences_triggers_update_and_delete() {
+        let pool = setup_in_memory_db().await;
+
+        let sentence = insert_sentence(&pool, "Initial text", "初期テキスト", None)
+            .await
+            .unwrap();
+
+        let after_insert = search_sentences(&pool, "Initial").await.unwrap();
+        assert_eq!(after_insert.len(), 1, "Insert trigger failed to index");
+
+        update_translation(
+            &pool,
+            &sentence.id,
+            "Updated translation",
+            Some("New Context"),
+        )
+        .await
+        .unwrap();
+
+        let search_old = search_sentences(&pool, "初期テキスト").await.unwrap();
+        assert_eq!(
+            search_old.len(),
+            0,
+            "Update trigger failed to remove old index"
+        );
+
+        let search_new = search_sentences(&pool, "Context").await.unwrap();
+        assert_eq!(
+            search_new.len(),
+            1,
+            "Update trigger failed to add new index"
+        );
+
+        delete_sentence(&pool, &sentence.id).await.unwrap();
+
+        let after_delete = search_sentences(&pool, "Initial").await.unwrap();
+        assert_eq!(
+            after_delete.len(),
+            0,
+            "Delete trigger failed to clear index"
+        );
     }
 }

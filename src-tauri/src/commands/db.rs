@@ -48,10 +48,18 @@ pub async fn save_sentence(
     Ok(new_sentence)
 }
 
-/// Fetches all saved sentences from the database for the Library view.
+/// Fetches sentences. If a search query is provided, it uses FTS5 for full-text search.
 #[command]
-pub async fn get_sentences(state: State<'_, db::DbState>) -> Result<Vec<Sentence>, AppError> {
-    db::fetch_all_sentences(&state.0).await.map_err(|e| {
+pub async fn get_sentences(
+    state: State<'_, db::DbState>,
+    search_query: Option<String>,
+) -> Result<Vec<Sentence>, AppError> {
+    let result = match search_query {
+        Some(query) if !query.trim().is_empty() => db::search_sentences(&state.0, &query).await,
+        _ => db::fetch_all_sentences(&state.0).await,
+    };
+
+    result.map_err(|e| {
         eprintln!("[commands] Database error in get_sentences: {}", e);
         AppError::Db(e)
     })

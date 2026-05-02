@@ -1,7 +1,7 @@
 mod sentences;
 
 pub use sentences::{
-    delete_sentence, fetch_all_sentences, insert_sentence, insert_sentences_bulk,
+    delete_sentence, fetch_all_sentences, insert_sentence, insert_sentences_bulk, search_sentences,
     update_translation,
 };
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions};
