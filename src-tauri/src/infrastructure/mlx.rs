@@ -77,8 +77,13 @@ impl MlxEngine {
 
         if !response.status().is_success() {
             let status = response.status();
-            let text = response.text().await.unwrap_or_default();
-            return Err(LlmError::Network(format!("HTTP {}: {}", status, text)));
+            let body = response.text().await.unwrap_or_default();
+            let snippet: String = body.chars().take(200).collect();
+            eprintln!(
+                "[mlx] LLM HTTP error: status={}, body_snippet={:?}",
+                status, snippet
+            );
+            return Err(LlmError::Network(format!("HTTP {}", status)));
         }
 
         let json_body: serde_json::Value = response
