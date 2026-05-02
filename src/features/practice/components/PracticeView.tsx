@@ -13,18 +13,22 @@ export function PracticeView() {
   const [attempt, setAttempt] = useState("");
   const [showOriginal, setShowOriginal] = useState(false); // Changed terminology
 
+  // Practice requires a non-empty translation as the target. Filter out sentences
+  // whose translation is missing/blank (e.g., translation failed or user cleared it).
+  const practiceCandidates = sentences.filter((s) => s.translated_text.trim().length > 0);
+
   // Initialize the first sentence when data loads
   useEffect(() => {
-    if (sentences && sentences.length > 0 && !currentSentence) {
-      const randomIndex = Math.floor(Math.random() * sentences.length);
-      setCurrentSentence(sentences[randomIndex]);
+    if (practiceCandidates.length > 0 && !currentSentence) {
+      const randomIndex = Math.floor(Math.random() * practiceCandidates.length);
+      setCurrentSentence(practiceCandidates[randomIndex]);
     }
-  }, [sentences, currentSentence]);
+  }, [practiceCandidates, currentSentence]);
 
   const handleNext = () => {
-    if (!sentences || sentences.length === 0) return;
-    const randomIndex = Math.floor(Math.random() * sentences.length);
-    setCurrentSentence(sentences[randomIndex]);
+    if (practiceCandidates.length === 0) return;
+    const randomIndex = Math.floor(Math.random() * practiceCandidates.length);
+    setCurrentSentence(practiceCandidates[randomIndex]);
     setAttempt("");
     setShowOriginal(false);
     reset();
@@ -53,11 +57,20 @@ export function PracticeView() {
     );
   }
 
-  if (!sentences || sentences.length === 0) {
+  if (sentences.length === 0) {
     return (
       <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
         <Bot className="h-12 w-12 mb-4 opacity-20" />
         <p>Your library is empty. Add some sentences first!</p>
+      </div>
+    );
+  }
+
+  if (practiceCandidates.length === 0) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
+        <Bot className="h-12 w-12 mb-4 opacity-20" />
+        <p>No translatable sentences yet (missing translations).</p>
       </div>
     );
   }
