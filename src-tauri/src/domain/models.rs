@@ -8,3 +8,13 @@ pub struct Sentence {
     pub source_context: Option<String>,
     pub created_at: i64,
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BackupPayload {
+    /// The schema version of this backup format
+    pub version: u32,
+    /// When this backup was created (timestamp, milliseconds)
+    pub exported_at: i64,
+    /// The actual user data
+    pub sentences: Vec<Sentence>,
+}

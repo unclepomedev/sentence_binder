@@ -1,8 +1,10 @@
+use crate::constants::LATEST_SCHEMA_VERSION;
 use crate::db;
 use crate::domain::engine::LlmEngine;
-use crate::domain::models::Sentence;
+use crate::domain::models::{BackupPayload, Sentence};
 use crate::error::AppError;
 use crate::infrastructure::mlx::{MlxConfig, MlxEngine};
+use chrono::Utc;
 use std::fs;
 use tauri::{AppHandle, State, command};
 use tauri_plugin_dialog::DialogExt;
@@ -46,10 +48,18 @@ pub async fn save_sentence(
     Ok(new_sentence)
 }
 
-/// Fetches all saved sentences from the database for the Library view.
+/// Fetches sentences. If a search query is provided, it uses FTS5 for full-text search.
 #[command]
-pub async fn get_sentences(state: State<'_, db::DbState>) -> Result<Vec<Sentence>, AppError> {
-    db::fetch_all_sentences(&state.0).await.map_err(|e| {
+pub async fn get_sentences(
+    state: State<'_, db::DbState>,
+    search_query: Option<String>,
+) -> Result<Vec<Sentence>, AppError> {
+    let result = match search_query {
+        Some(query) if !query.trim().is_empty() => db::search_sentences(&state.0, &query).await,
+        _ => db::fetch_all_sentences(&state.0).await,
+    };
+
+    result.map_err(|e| {
         eprintln!("[commands] Database error in get_sentences: {}", e);
         AppError::Db(e)
     })
@@ -128,6 +138,12 @@ pub async fn export_sentences_json(
         AppError::Db(e)
     })?;
 
+    let payload = BackupPayload {
+        version: LATEST_SCHEMA_VERSION,
+        exported_at: Utc::now().timestamp_millis(),
+        sentences,
+    };
+
     let file_path = app
         .dialog()
         .file()
@@ -142,7 +158,7 @@ pub async fn export_sentences_json(
     let path_buf = path
         .into_path()
         .map_err(|_| AppError::Validation("Unsupported file path format".into()))?;
-    let json_string = serde_json::to_string_pretty(&sentences).map_err(|e| {
+    let json_string = serde_json::to_string_pretty(&payload).map_err(|e| {
         eprintln!("[commands] JSON serialization error: {}", e);
         AppError::Internal(format!("Failed to stringify data: {}", e))
     })?;
@@ -182,16 +198,22 @@ pub async fn import_sentences_json(
         AppError::Internal(format!("Failed to read file: {}", e))
     })?;
 
-    let sentences: Vec<Sentence> = serde_json::from_str(&file_contents).map_err(|e| {
+    let payload: BackupPayload = serde_json::from_str(&file_contents).map_err(|e| {
         eprintln!("[commands] JSON parsing error: {}", e);
         AppError::Validation(format!("Invalid JSON format: {}", e))
     })?;
 
-    if sentences.is_empty() {
+    if payload.version > LATEST_SCHEMA_VERSION {
+        return Err(AppError::Validation(
+            "This backup is from a newer version of the app. Please update Sentence Binder to import it.".into()
+        ));
+    }
+
+    if payload.sentences.is_empty() {
         return Ok(0);
     }
 
-    let inserted_count = db::insert_sentences_bulk(&state.0, &sentences)
+    let inserted_count = db::insert_sentences_bulk(&state.0, &payload.sentences)
         .await
         .map_err(|e| {
             eprintln!("[commands] Database error in import_sentences_json: {}", e);
