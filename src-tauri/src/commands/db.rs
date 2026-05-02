@@ -88,6 +88,14 @@ pub async fn update_sentence_translation(
         .filter(|t| !t.is_empty())
         .collect();
 
+    // Tags are stored as a comma-joined string and parsed via split(','),
+    // so reject any tag containing a comma to prevent corruption.
+    if clean_tags.iter().any(|t| t.contains(',')) {
+        return Err(AppError::Validation(
+            "Tags must not contain commas".to_string(),
+        ));
+    }
+
     db::update_translation(&state.0, &id, &new_translation, new_context, &clean_tags)
         .await
         .map_err(|e| match e {
