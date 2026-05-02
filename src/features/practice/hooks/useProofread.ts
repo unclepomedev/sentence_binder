@@ -16,7 +16,8 @@ export function useProofread() {
     },
     onError: (err) => {
       console.error(err);
-      toast.error(`Proofread failed: ${err}`);
+      const message = err instanceof Error ? err.message : String(err);
+      toast.error(`Proofread failed: ${message}`);
     },
   });
 
