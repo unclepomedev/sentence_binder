@@ -17,6 +17,7 @@ export function LibrarySearch({ value, onChange }: LibrarySearchProps) {
       <Input
         type="text"
         placeholder="Search sentences, translations, or context..."
+        aria-label="Search sentences, translations, or context"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         autoComplete="off"

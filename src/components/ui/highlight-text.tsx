@@ -21,15 +21,28 @@ export function HighlightText({ text, query, className, ...props }: HighlightTex
     );
   }
 
-  const escapedQuery = normalizedQuery.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&");
-  const parts = text.split(new RegExp(`(${escapedQuery})`, "gi"));
+  // The search query to highlight. Callers must pass a pre-normalized (trimmed) value;
+  // pass an empty string (or omit) to disable highlighting.
+  const terms = normalizedQuery.split(/\s+/).filter(Boolean);
+  if (terms.length === 0) {
+    return (
+      <span className={className} {...props}>
+        {text}
+      </span>
+    );
+  }
+
+  const escapedTerms = terms.map((t) => t.replace(/[-[\]{}()*+?.,\\^$|#]/g, "\\$&"));
+  const splitRegex = new RegExp(`(${escapedTerms.join("|")})`, "gi");
+  const matchRegex = new RegExp(`^(?:${escapedTerms.join("|")})$`, "i");
+  const parts = text.split(splitRegex);
 
   return (
     <span className={className} {...props}>
       {parts.map((part, index) => {
         const uniqueKey = `${part}-${index}`;
 
-        return part.toLowerCase() === normalizedQuery.toLowerCase() ? (
+        return matchRegex.test(part) ? (
           <mark
             key={uniqueKey}
             className="bg-yellow-400/40 text-foreground rounded-xs px-0.5 font-medium transition-colors"
