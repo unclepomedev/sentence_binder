@@ -35,7 +35,3 @@ fmt-all: fmt-ts fmt-rs fmt-sql
 no-jpn:
     # Fails if any Han/Hiragana/Katakana character is found in tracked sources.
     ! rg --hidden --glob '!.git' '[\p{Han}\p{Hiragana}\p{Katakana}]' .
-
-# TODO: remove this
-balus:
-    rm -rf ~/Library/Application\ Support/com.unclepomedev.sentence_binder.app

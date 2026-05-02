@@ -169,17 +169,12 @@ pub async fn search_sentences(
         return fetch_all_sentences(pool).await;
     }
 
-    let fts_query = query
-        .split_whitespace()
-        .map(|term| {
-            if let Some(tag_value) = term.strip_prefix("tag:") {
-                format!("tags:\"{}\"*", tag_value.replace('"', ""))
-            } else {
-                format!("\"{}\"*", term.replace('"', ""))
-            }
-        })
-        .collect::<Vec<_>>()
-        .join(" AND ");
+    let fts_query = build_fts_query(query);
+
+    // If the query only contained invalid empty tags (e.g., "tag:  "), fetch all
+    if fts_query.is_empty() {
+        return fetch_all_sentences(pool).await;
+    }
 
     let rows = sqlx::query_as::<_, SentenceRow>(
         r#"
@@ -195,6 +190,52 @@ pub async fn search_sentences(
     .await?;
 
     Ok(rows.into_iter().map(Sentence::from).collect())
+}
+
+/// Parses a raw search string into an FTS5 MATCH query.
+/// Supports exact matches via quotes and tag filtering (e.g., `tag:"business trip"`).
+fn build_fts_query(query: &str) -> String {
+    let mut terms = Vec::new();
+    let mut current_term = String::new();
+    let mut in_quotes = false;
+
+    for c in query.chars() {
+        match c {
+            '"' => in_quotes = !in_quotes,
+            ' ' | '\t' | '\n' if !in_quotes => {
+                if !current_term.is_empty() {
+                    terms.push(current_term.clone());
+                    current_term.clear();
+                }
+            }
+            _ => current_term.push(c),
+        }
+    }
+    if !current_term.is_empty() {
+        terms.push(current_term);
+    }
+
+    terms
+        .into_iter()
+        .filter_map(|term| {
+            if let Some(tag_value) = term.strip_prefix("tag:") {
+                let clean_val = tag_value.trim();
+                if clean_val.is_empty() {
+                    None
+                } else {
+                    Some(format!("tags:\"{}\"*", clean_val))
+                }
+            } else {
+                let clean_val = term.trim();
+                if clean_val.is_empty() {
+                    None
+                } else {
+                    Some(format!("\"{}\"*", clean_val))
+                }
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" AND ")
 }
 
 // ===============================================================================================
@@ -739,5 +780,45 @@ mod tests {
 
         let results_none = search_sentences(&pool, "https://google.com").await.unwrap();
         assert_eq!(results_none.len(), 0);
+    }
+
+    #[test]
+    fn test_build_fts_query_standard_terms() {
+        assert_eq!(build_fts_query("apple"), "\"apple\"*");
+        assert_eq!(
+            build_fts_query("apple banana"),
+            "\"apple\"* AND \"banana\"*"
+        );
+    }
+
+    #[test]
+    fn test_build_fts_query_quoted_phrases() {
+        assert_eq!(build_fts_query("\"apple banana\""), "\"apple banana\"*");
+        assert_eq!(
+            build_fts_query("start \"middle phrase\" end"),
+            "\"start\"* AND \"middle phrase\"* AND \"end\"*"
+        );
+    }
+
+    #[test]
+    fn test_build_fts_query_tags() {
+        assert_eq!(build_fts_query("tag:business"), "tags:\"business\"*");
+        assert_eq!(
+            build_fts_query("tag:\"business trip\""),
+            "tags:\"business trip\"*"
+        );
+    }
+
+    #[test]
+    fn test_build_fts_query_mixed_and_empty() {
+        // Mixed tags and terms
+        assert_eq!(
+            build_fts_query("apple tag:fruit \"red delicious\""),
+            "\"apple\"* AND tags:\"fruit\"* AND \"red delicious\"*"
+        );
+
+        // Empty tags should be stripped out cleanly
+        assert_eq!(build_fts_query("tag:"), "");
+        assert_eq!(build_fts_query("apple tag:"), "\"apple\"*");
     }
 }

@@ -97,11 +97,13 @@ export function SentenceCardViewer({
           {tags.map((tag) => (
             <Badge
               key={tag}
+              asChild
               variant="secondary"
               className="px-2 py-0.5 text-[10px] cursor-pointer hover:bg-secondary/80 transition-colors"
-              onClick={() => onTagClick(tag)}
             >
-              <HighlightText text={tag} query={searchQuery} />
+              <button type="button" onClick={() => onTagClick(tag)}>
+                <HighlightText text={tag} query={searchQuery} />
+              </button>
             </Badge>
           ))}
         </div>

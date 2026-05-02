@@ -30,7 +30,7 @@ export function SentenceEditForm({
       const tagsArray = draftTags
         .split(",")
         .map((t) => t.trim())
-        .filter((t) => t.length > 0);
+        .filter((t, index, all) => t.length > 0 && all.indexOf(t) === index);
 
       await onSave(draftText.trim(), draftContext.trim() || null, tagsArray);
     } catch {
