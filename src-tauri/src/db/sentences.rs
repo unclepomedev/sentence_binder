@@ -154,9 +154,10 @@ pub async fn search_sentences(
     }
     let fts_query = query
         .split_whitespace()
-        .map(|term| format!("{}*", term.replace('"', "")))
+        .map(|term| format!("\"{}\"*", term.replace('"', "")))
         .collect::<Vec<_>>()
         .join(" AND ");
+
     let rows = sqlx::query_as::<_, SentenceRow>(
         r#"
         SELECT s.id, s.original_text, s.translated_text, s.source_context, s.created_at
@@ -173,6 +174,9 @@ pub async fn search_sentences(
     Ok(rows.into_iter().map(Sentence::from).collect())
 }
 
+// ===============================================================================================
+// Unit tests
+// ===============================================================================================
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -623,5 +627,42 @@ mod tests {
             0,
             "Delete trigger failed to clear index"
         );
+    }
+
+    #[tokio::test]
+    async fn test_search_sentences_with_special_characters() {
+        let pool = setup_in_memory_db().await;
+
+        insert_sentence(
+            &pool,
+            "Check out this link: https://example.com/page?q=1",
+            "リンクを見て：https://example.com/page?q=1",
+            Some("file.txt"),
+        )
+        .await
+        .unwrap();
+
+        insert_sentence(&pool, "Normal sentence here.", "普通", None)
+            .await
+            .unwrap();
+
+        let results_url = search_sentences(&pool, "https://")
+            .await
+            .expect("Search with https:// failed");
+        assert_eq!(results_url.len(), 1);
+        assert!(results_url[0].original_text.contains("https://example.com"));
+
+        let results_domain = search_sentences(&pool, "example.com")
+            .await
+            .expect("Search with dot failed");
+        assert_eq!(results_domain.len(), 1);
+
+        let results_file = search_sentences(&pool, "file.txt")
+            .await
+            .expect("Search with extension failed");
+        assert_eq!(results_file.len(), 1);
+
+        let results_none = search_sentences(&pool, "https://google.com").await.unwrap();
+        assert_eq!(results_none.len(), 0);
     }
 }
