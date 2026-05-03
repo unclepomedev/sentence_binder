@@ -23,6 +23,8 @@ pub struct BackupPayload {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ProofreadFeedback {
     pub feedback: String,
+    #[serde(default)]
     pub key_expression: String,
+    #[serde(default)]
     pub example: String,
 }

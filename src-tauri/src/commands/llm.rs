@@ -104,13 +104,59 @@ fn clean_llm_json(raw: &str) -> String {
         s = rest.trim_end();
     }
 
-    if let (Some(start), Some(end)) = (s.find('{'), s.rfind('}'))
-        && end >= start
-    {
-        return s[start..=end].to_string();
+    if let Some(extracted) = extract_first_balanced_object(s) {
+        return extracted;
     }
 
     s.to_string()
+}
+
+/// Scans `s` for the first balanced `{ ... }` JSON object, correctly handling
+/// quoted strings (with escape sequences) so that braces inside strings do not
+/// affect nesting. Returns `None` if no balanced object is found.
+fn extract_first_balanced_object(s: &str) -> Option<String> {
+    let bytes = s.as_bytes();
+    let len = bytes.len();
+    let mut i = 0;
+    while i < len {
+        if bytes[i] == b'{' {
+            let start = i;
+            let mut depth = 0i32;
+            let mut in_string = false;
+            let mut escape = false;
+            let mut j = i;
+            while j < len {
+                let c = bytes[j];
+                if in_string {
+                    if escape {
+                        escape = false;
+                    } else if c == b'\\' {
+                        escape = true;
+                    } else if c == b'"' {
+                        in_string = false;
+                    }
+                } else {
+                    match c {
+                        b'"' => in_string = true,
+                        b'{' => depth += 1,
+                        b'}' => {
+                            depth -= 1;
+                            if depth == 0 {
+                                return Some(s[start..=j].to_string());
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                j += 1;
+            }
+            // Unbalanced from this `{`; stop scanning further opens since
+            // the remainder is part of an unterminated object.
+            return None;
+        }
+        i += 1;
+    }
+    None
 }
 
 #[cfg(test)]
@@ -140,6 +186,46 @@ mod tests {
         let raw = "Sure! Here is the result:\n{\"feedback\":\"f\",\"key_expression\":\"k\",\"example\":\"e\"}\nHope it helps.";
         let out = parse_proofread_response(raw);
         assert_eq!(out.feedback, "f");
+    }
+
+    #[test]
+    fn parses_json_with_trailing_brace_in_prose() {
+        // A stray `}` after the JSON object (e.g. from prose or a code-fence
+        // mishap) must not be swallowed into the extracted JSON.
+        let raw = "{\"feedback\":\"f\",\"key_expression\":\"k\",\"example\":\"e\"}\nNote: }";
+        let out = parse_proofread_response(raw);
+        assert_eq!(out.feedback, "f");
+        assert_eq!(out.key_expression, "k");
+        assert_eq!(out.example, "e");
+    }
+
+    #[test]
+    fn ignores_braces_inside_strings() {
+        let raw = r#"{"feedback":"use { and }","key_expression":"k","example":"e"}"#;
+        let out = parse_proofread_response(raw);
+        assert_eq!(out.feedback, "use { and }");
+        assert_eq!(out.key_expression, "k");
+        assert_eq!(out.example, "e");
+    }
+
+    #[test]
+    fn parses_json_with_missing_optional_fields() {
+        // Only `feedback` is present; `key_expression` and `example` are absent.
+        // Must succeed (no raw-text fallback) with empty strings for missing fields.
+        let raw = r#"{"feedback":"only feedback"}"#;
+        let out = parse_proofread_response(raw);
+        assert_eq!(out.feedback, "only feedback");
+        assert_eq!(out.key_expression, "");
+        assert_eq!(out.example, "");
+    }
+
+    #[test]
+    fn parses_json_with_missing_example() {
+        let raw = r#"{"feedback":"f","key_expression":"k"}"#;
+        let out = parse_proofread_response(raw);
+        assert_eq!(out.feedback, "f");
+        assert_eq!(out.key_expression, "k");
+        assert_eq!(out.example, "");
     }
 
     #[test]
