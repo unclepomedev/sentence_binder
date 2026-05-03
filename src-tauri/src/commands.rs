@@ -9,4 +9,4 @@ pub use db::{
     delete_sentence, export_sentences_json, get_sentences, import_sentences_json, save_sentence,
     update_sentence_translation,
 };
-pub use llm::extract_usage;
+pub use llm::{extract_usage, proofread_sentence};
