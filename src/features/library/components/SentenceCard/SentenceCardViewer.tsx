@@ -88,7 +88,7 @@ export function SentenceCardViewer({
         {translatedText ? (
           <HighlightText text={translatedText} query={searchQuery} />
         ) : (
-          "[ Translation Failed ]"
+          "[ No Translation ]"
         )}
       </p>
 
