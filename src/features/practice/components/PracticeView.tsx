@@ -1,4 +1,5 @@
 import { Bot, Loader2 } from "lucide-react";
+import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { useSentences } from "@/features/library/hooks/useSentences";
 import type { Sentence } from "@/types";
@@ -51,27 +52,27 @@ export function PracticeView() {
 
   if (isLoading) {
     return (
-      <div className="h-full flex items-center justify-center text-muted-foreground">
+      <CenteredState>
         <Loader2 className="animate-spin h-6 w-6 mr-2" /> Loading practice data...
-      </div>
+      </CenteredState>
     );
   }
 
   if (sentences.length === 0) {
     return (
-      <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
+      <ColumnState>
         <Bot className="h-12 w-12 mb-4 opacity-20" />
         <p>Your library is empty. Add some sentences first!</p>
-      </div>
+      </ColumnState>
     );
   }
 
   if (practiceCandidates.length === 0) {
     return (
-      <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
+      <ColumnState>
         <Bot className="h-12 w-12 mb-4 opacity-20" />
         <p>No translatable sentences yet (missing translations).</p>
-      </div>
+      </ColumnState>
     );
   }
 
@@ -79,12 +80,12 @@ export function PracticeView() {
 
   return (
     <div className="h-full flex flex-col max-w-3xl mx-auto py-6 overflow-hidden">
-      <div className="mb-8 shrink-0">
+      <header className="mb-8 shrink-0">
         <h1 className="text-2xl font-bold tracking-tight">Practice Mode</h1>
         <p className="text-muted-foreground text-sm">
           Translate the target meaning back into the original language.
         </p>
-      </div>
+      </header>
 
       <PracticeCard
         sentence={currentSentence}
@@ -97,6 +98,20 @@ export function PracticeView() {
         onProofread={handleProofread}
         onNext={handleNext}
       />
+    </div>
+  );
+}
+
+function CenteredState({ children }: { children: ReactNode }) {
+  return (
+    <div className="h-full flex items-center justify-center text-muted-foreground">{children}</div>
+  );
+}
+
+function ColumnState({ children }: { children: ReactNode }) {
+  return (
+    <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
+      {children}
     </div>
   );
 }

@@ -1,6 +1,10 @@
 import type { Sentence } from "@/types";
 
-export function PracticeTarget({ sentence }: { sentence: Sentence }) {
+interface PracticeTargetProps {
+  sentence: Sentence;
+}
+
+export function PracticeTarget({ sentence }: PracticeTargetProps) {
   return (
     <div className="space-y-2">
       <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
