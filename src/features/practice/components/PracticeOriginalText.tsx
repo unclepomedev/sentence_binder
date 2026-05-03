@@ -1,10 +1,9 @@
-export function PracticeOriginalText({
-  originalText,
-  isVisible,
-}: {
+interface PracticeOriginalTextProps {
   originalText: string;
   isVisible: boolean;
-}) {
+}
+
+export function PracticeOriginalText({ originalText, isVisible }: PracticeOriginalTextProps) {
   if (!isVisible) return null;
 
   return (

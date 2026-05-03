@@ -8,3 +8,15 @@ export type Sentence = {
   /** milliseconds */
   created_at: number;
 };
+
+export type ProofreadPayload = {
+  originalText: string;
+  translatedText: string;
+  userAttempt: string;
+};
+
+export interface ProofreadFeedback {
+  feedback: string;
+  key_expression: string;
+  example: string;
+}

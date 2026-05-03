@@ -1,6 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import type { Sentence } from "@/types";
+import type { ProofreadFeedback, Sentence } from "@/types";
 import { PracticeControls } from "./PracticeControls";
 import { PracticeFeedback } from "./PracticeFeedback";
 import { PracticeInput } from "./PracticeInput";
@@ -10,7 +10,7 @@ import { PracticeTarget } from "./PracticeTarget";
 interface PracticeCardProps {
   sentence: Sentence;
   attempt: string;
-  feedback?: string;
+  feedback?: ProofreadFeedback;
   showOriginal: boolean;
   isProofreading: boolean;
   onAttemptChange: (value: string) => void;

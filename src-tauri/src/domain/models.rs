@@ -19,3 +19,10 @@ pub struct BackupPayload {
     /// The actual user data
     pub sentences: Vec<Sentence>,
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ProofreadFeedback {
+    pub feedback: String,
+    pub key_expression: String,
+    pub example: String,
+}

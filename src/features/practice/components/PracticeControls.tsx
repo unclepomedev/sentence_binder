@@ -26,17 +26,7 @@ export function PracticeControls({
         disabled={isProofreading}
         className="text-muted-foreground"
       >
-        {showOriginal ? (
-          <>
-            <EyeOff className="h-4 w-4 mr-2" />
-            Hide Original
-          </>
-        ) : (
-          <>
-            <Eye className="h-4 w-4 mr-2" />
-            Show Original
-          </>
-        )}
+        <ToggleOriginalLabel showOriginal={showOriginal} />
       </Button>
 
       <div className="flex gap-2">
@@ -57,5 +47,16 @@ export function PracticeControls({
         </Button>
       </div>
     </div>
+  );
+}
+
+function ToggleOriginalLabel({ showOriginal }: { showOriginal: boolean }) {
+  const Icon = showOriginal ? EyeOff : Eye;
+  const label = showOriginal ? "Hide Original" : "Show Original";
+  return (
+    <>
+      <Icon className="h-4 w-4 mr-2" />
+      {label}
+    </>
   );
 }

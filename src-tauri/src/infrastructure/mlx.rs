@@ -6,7 +6,16 @@ use std::time::Duration;
 // prompt templates=================================================================================
 const TRANSLATE_SYSTEM_PROMPT: &str = "You are a professional translator. Translate the following English text into natural, fluent Japanese. Provide ONLY the translation, without any explanations or conversational filler.";
 const USAGE_SYSTEM_PROMPT: &str = "You are an English teacher. Explain the meaning and usage of the highlighted expression based on the provided context. Provide a concise explanation in Japanese and one clear example sentence in English. Output ONLY the explanation and example.";
-const PROOFREAD_SYSTEM_PROMPT: &str = "You are a supportive language tutor. The user is practicing translating from Japanese to English. You will be provided with the Japanese context, the correct English answer, and the user's attempt. Briefly point out any grammatical errors, unnatural phrasing, or missing nuances. If the user's attempt is correct but phrased differently than the original, warmly tell them it is a valid translation. Keep your feedback concise, encouraging, and strictly under 3 sentences.";
+const PROOFREAD_SYSTEM_PROMPT: &str = r#"You are an encouraging language tutor. The user is translating from Japanese to English.
+You will receive the Japanese context, the target English sentence, and the user's attempt.
+
+You MUST respond with a raw JSON object containing exactly these three keys:
+{
+  "feedback": "Briefly correct grammatical or nuance errors, or warmly validate if correct.",
+  "key_expression": "One important English vocabulary word or idiom from the target sentence.",
+  "example": "A brief, natural English example sentence using the key expression."
+}
+Do not output any markdown formatting, code blocks, or extra text outside this JSON object."#;
 // -------------------------------------------------------------------------------------------------
 
 const MLX_CLIENT_TIMEOUT_SECS: u64 = 60;
@@ -133,3 +142,92 @@ impl LlmEngine for MlxEngine {
     }
 }
 // TODO: replace hardcoded English/Japanese with user-provided language settings
+
+// ===============================================================================================
+// Unit tests
+// ===============================================================================================
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+    use wiremock::matchers::method;
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    #[tokio::test]
+    async fn test_send_chat_request_success() {
+        let mock_server = MockServer::start().await;
+
+        let mock_response = json!({
+            "choices": [{
+                "message": {
+                    "content": "This is the mocked AI response."
+                }
+            }]
+        });
+
+        Mock::given(method("POST"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(mock_response))
+            .mount(&mock_server)
+            .await;
+
+        let config = MlxConfig {
+            endpoint: mock_server.uri(),
+            temperature: 0.3,
+        };
+        let engine = MlxEngine::new(config);
+
+        let result = engine.send_chat_request("system", "user").await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "This is the mocked AI response.");
+    }
+
+    #[tokio::test]
+    async fn test_send_chat_request_handles_http_errors() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .respond_with(ResponseTemplate::new(500).set_body_string("Model crashed"))
+            .mount(&mock_server)
+            .await;
+
+        let config = MlxConfig {
+            endpoint: mock_server.uri(),
+            temperature: 0.3,
+        };
+        let engine = MlxEngine::new(config);
+
+        let result = engine.send_chat_request("system", "user").await;
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            LlmError::Network(msg) => assert!(msg.contains("HTTP 500")),
+            _ => panic!("Expected Network error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_send_chat_request_handles_malformed_json() {
+        let mock_server = MockServer::start().await;
+
+        let bad_json = json!({ "wrong_key": "data" });
+
+        Mock::given(method("POST"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(bad_json))
+            .mount(&mock_server)
+            .await;
+
+        let config = MlxConfig {
+            endpoint: mock_server.uri(),
+            temperature: 0.3,
+        };
+        let engine = MlxEngine::new(config);
+
+        let result = engine.send_chat_request("system", "user").await;
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            LlmError::Parse(msg) => assert!(msg.contains("Missing content field")),
+            _ => panic!("Expected Parse error"),
+        }
+    }
+}

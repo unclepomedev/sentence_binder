@@ -1,4 +1,5 @@
 use crate::domain::engine::LlmEngine;
+use crate::domain::models::ProofreadFeedback;
 use crate::error::AppError;
 use crate::infrastructure::mlx::{MlxConfig, MlxEngine};
 use tauri::command;
@@ -24,7 +25,7 @@ pub async fn proofread_sentence(
     original_text: String,
     translated_text: String,
     user_attempt: String,
-) -> Result<String, AppError> {
+) -> Result<ProofreadFeedback, AppError> {
     let attempt = user_attempt.trim();
     if attempt.is_empty() {
         return Err(AppError::Validation(
@@ -34,7 +35,7 @@ pub async fn proofread_sentence(
 
     let engine = MlxEngine::new(MlxConfig::default());
 
-    let feedback = engine
+    let raw_response = engine
         .proofread_attempt(&original_text, &translated_text, attempt)
         .await
         .map_err(|e| {
@@ -42,5 +43,13 @@ pub async fn proofread_sentence(
             e
         })?;
 
-    Ok(feedback)
+    let feedback_obj: ProofreadFeedback = serde_json::from_str(&raw_response).map_err(|e| {
+        eprintln!(
+            "[commands] Failed to parse LLM JSON: {} \nRaw output: {}",
+            e, raw_response
+        );
+        AppError::Internal("AI returned malformed feedback format.".to_string())
+    })?;
+
+    Ok(feedback_obj)
 }
