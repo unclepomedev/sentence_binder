@@ -6,7 +6,7 @@ on:
 
 jobs:
   release:
-    name: Build & Release (macOS)
+    name: Build & Release
     runs-on: macos-latest
     permissions:
       contents: write
