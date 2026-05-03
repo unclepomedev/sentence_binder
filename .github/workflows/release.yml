@@ -29,7 +29,7 @@ jobs:
           workspaces: src-tauri
 
       - name: Build Tauri app
-        uses: tauri-apps/tauri-action@3a44005a6b66d6af4b709c2f646f1ba40c0541be # v0
+        uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
