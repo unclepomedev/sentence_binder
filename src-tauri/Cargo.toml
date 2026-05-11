@@ -22,7 +22,7 @@ serde = { version = "1.0.228", features = ["derive"] }
 sqlx = { version = "0.8.6", features = ["sqlite", "runtime-tokio", "migrate"] }
 uuid = { version = "1.23.1", features = ["v4"] }
 chrono = "0.4.44"
-tokio = { version = "1.52.1", features = ["full"] }
+tokio = { version = "1.52.3", features = ["full"] }
 core-foundation = "0.10.1"
 core-graphics = "0.25"
 arboard = "3.6.1"
